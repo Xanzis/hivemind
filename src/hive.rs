@@ -182,13 +182,19 @@ impl<T> HexBoard<T> {
         // return every cell on the perimeter that isn't occupied and isn't impassible
         let from_neighbors = from.neighbor_set();
 
+        // the destination is passable if:
+        // - the dest is not occupied
+        // - the source and dest share exactly one populated neighbor cell
+        //   - 0 and the dest has hopped a peninsula or left the hive
+        //   - 2 and the passage is blocked
         from.neighbors()
             .filter(|c| !self.occupied().contains(c))
-            .filter(|c| self.perimeter().contains(c))
             .filter(|c| {
                 c.neighbor_set()
                     .intersection(&from_neighbors)
-                    .any(|&x| self.is_empty(x))
+                    .filter(|&&x| !self.is_empty(x))
+                    .count()
+                    == 1
             })
             .collect()
     }
