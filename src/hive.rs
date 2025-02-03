@@ -199,6 +199,25 @@ impl<T> HexBoard<T> {
             .collect()
     }
 
+    fn passable_climber_coords(&self, from: HexCoord) -> Vec<HexCoord> {
+        // return cells passable to climbers
+        let from_neighbors = from.neighbor_set();
+
+        // the destination is passable if:
+        // - the source and dest share one or two populated neighbor cells, or the dest is populated
+        //   - 0 and the dest has hopped a peninsula or left the hive
+        //   - unless the dest is populated, in which case the dest has not left the hive
+        from.neighbors()
+            .filter(|&c| {
+                (c.neighbor_set()
+                    .intersection(&from_neighbors)
+                    .filter(|&&x| !self.is_empty(x))
+                    .count()
+                    >= 1) || !self.is_empty(c)
+            })
+            .collect()
+    }
+
     fn is_bridge(&self, coord: HexCoord) -> bool {
         // if the piece is not a bridge between disjoint hives the number of cells reachable
         // from one of its neighbors (minus the piece in question) should be occupied-1
@@ -310,21 +329,8 @@ impl HivePiece {
         }
 
         match self.bug {
-            Queen => board
-                .passable_coords(coord)
-                .into_iter()
-                .filter(|&c| board.neighbor_cells(c).count() > 1)
-                .collect(),
-            Beetle => {
-                let perimeter = board.perimeter();
-                let occupied = board.occupied();
-                // >1 check needed bc otherwise the beetle counts itself and wanders off
-                coord
-                    .neighbors()
-                    .filter(|c| perimeter.contains(c) || occupied.contains(c))
-                    .filter(|&c| board.neighbor_cells(c).count() > 1)
-                    .collect()
-            }
+            Queen => board.passable_coords(coord),
+            Beetle => board.passable_climber_coords(coord),
             Grasshopper => {
                 let mut res = Vec::new();
                 let perimeter = board.perimeter();
@@ -350,6 +356,7 @@ impl HivePiece {
                 res
             }
             Spider => {
+            	// TODO these spider moves still don't look right
                 let one_away: HashSet<HexCoord> =
                     board.passable_coords(coord).into_iter().collect();
                 let two_away: HashSet<HexCoord> = one_away
@@ -362,7 +369,7 @@ impl HivePiece {
                     .flat_map(|&c| board.passable_coords(c))
                     .filter(|&c| c != coord)
                     .filter(|c| !one_away.contains(c))
-                    .filter(|&c| board.neighbor_cells(c).count() > 1)
+                    .filter(|&c| board.neighbor_cells(c).filter(|&x| x != coord).count() > 1) // stop spider from climbing off the hive on itself
                     .collect()
             }
             Ant => {
@@ -493,6 +500,12 @@ impl HiveGame {
         for (&c, &p) in self.board.all_top().filter(|(_, x)| x.color == self.turn) {
             //println!("Checking out {:?}", (c, p));
             let dests = p.valid_dests(&self.board, c);
+
+            //if p.bug == HiveBug::Spider {
+            //	println!("Checking out {:?}", (c, p));
+            //	println!("It can move to {:?}", dests);
+            //}
+
             //println!("It can move to {:?}", dests);
             res.extend(dests.into_iter().map(|d| HiveMove::Move(p, c, d)));
         }

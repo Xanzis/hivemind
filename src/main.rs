@@ -3,7 +3,7 @@ mod hive;
 fn main() {
     let mut game = hive::HiveGame::new();
 
-    for i in 0..100 {
+    for i in 0..200 {
         //println!("Game state:\n{:?}", game);
         println!("Game disp:\n{}", game.disp());
 
@@ -12,13 +12,30 @@ fn main() {
 
         let i = 9469876982721 % next.len();
 
+        println!("Move: {:?}", next[i]);
+
         let res = game.make_move(next[i]);
 
-        if let Some(g) = res.game() {
-            game = g
-        } else {
-            println!("Game over");
-            break;
+        match res {
+            hive::HiveResult::Cont(g) => {
+                game = g;
+            },
+            hive::HiveResult::WinW => {
+                println!("WinW");
+                break
+            },
+            hive::HiveResult::WinB => {
+                println!("WinB");
+                break
+            },
+            hive::HiveResult::Draw => {
+                println!("Draw");
+                break
+            },
+            hive::HiveResult::Invalid => {
+                println!("Invalid");
+                break
+            },
         }
     }
 }
