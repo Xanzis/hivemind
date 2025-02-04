@@ -53,7 +53,7 @@ impl HexCoord {
 
 // the vec is kept empty for references to empty cells
 #[derive(Debug, Clone)]
-struct HexBoard<T> {
+pub struct HexBoard<T> {
     map: HashMap<HexCoord, Vec<T>>,
     empty: Vec<T>,
 
@@ -71,11 +71,11 @@ impl<T> HexBoard<T> {
         }
     }
 
-    fn get<'a>(&'a self, coord: HexCoord) -> &'a Vec<T> {
+    pub fn get<'a>(&'a self, coord: HexCoord) -> &'a Vec<T> {
         self.map.get(&coord).unwrap_or(&self.empty)
     }
 
-    fn get_top<'a>(&'a self, coord: HexCoord) -> Option<&'a T> {
+    pub fn get_top<'a>(&'a self, coord: HexCoord) -> Option<&'a T> {
         // get the top of the cell, if it exists
         self.get(coord).last()
     }
@@ -111,7 +111,7 @@ impl<T> HexBoard<T> {
         self.map.get(&coord).map(|v| v.is_empty()).unwrap_or(true)
     }
 
-    fn perimeter(&self) -> HashSet<HexCoord> {
+    pub fn perimeter(&self) -> HashSet<HexCoord> {
         if let Some(p) = self.perimeter_cache.clone() {
             p
         } else {
@@ -137,7 +137,7 @@ impl<T> HexBoard<T> {
         res
     }
 
-    fn occupied(&self) -> HashSet<HexCoord> {
+    pub fn occupied(&self) -> HashSet<HexCoord> {
         if let Some(o) = self.occupied_cache.clone() {
             o
         } else {
@@ -153,12 +153,12 @@ impl<T> HexBoard<T> {
         res
     }
 
-    fn neighbor_cells<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = HexCoord> + 'a {
+    pub fn neighbor_cells<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = HexCoord> + 'a {
         let nb: Vec<_> = coord.neighbors().collect();
         nb.into_iter().filter(|&x| self.get_top(x).is_some())
     }
 
-    fn neighbor_pieces<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = &'a T> {
+    pub fn neighbor_pieces<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = &'a T> {
         let nb: Vec<_> = coord.neighbors().collect();
         nb.into_iter().filter_map(|x| self.get_top(x))
     }
@@ -413,13 +413,15 @@ impl HivePiece {
 pub enum HiveMove {
     Place(HivePiece, HexCoord),
     Move(HivePiece, HexCoord, HexCoord),
+    Pass,
 }
 
 impl HiveMove {
-    pub fn piece(&self) -> HivePiece {
+    pub fn piece(&self) -> Option<HivePiece> {
         match self {
-            &HiveMove::Place(p, _) => p,
-            &HiveMove::Move(p, _, _) => p,
+            &HiveMove::Place(p, _) => Some(p),
+            &HiveMove::Move(p, _, _) => Some(p),
+            &HiveMove::Pass => None,
         }
     }
 }
@@ -482,6 +484,26 @@ impl HiveGame {
         }
     }
 
+    pub fn round(&self) -> usize {
+        self.round
+    }
+
+    pub fn turn(&self) -> bool {
+        self.turn
+    }
+
+    pub fn queen_loc(&self, color: bool) -> Option<HexCoord> {
+        if color {
+            self.queen_loc_w
+        } else {
+            self.queen_loc_b
+        }
+    }
+
+    pub fn board<'a>(&'a self) -> &'a HexBoard<HivePiece> {
+        &self.board
+    }
+
     fn queen_surrounded(&self, color: bool) -> bool {
         if color {
             if let Some(loc) = self.queen_loc_w {
@@ -531,6 +553,10 @@ impl HiveGame {
 
             //println!("It can move to {:?}", dests);
             res.extend(dests.into_iter().map(|d| HiveMove::Move(p, c, d)));
+        }
+
+        if res.len() == 0 {
+            res.push(HiveMove::Pass);
         }
 
         res
@@ -645,6 +671,7 @@ impl HiveGame {
 
                 res.board.mov(s, d);
             }
+            HiveMove::Pass => {}
         }
 
         res.turn = !res.turn;
