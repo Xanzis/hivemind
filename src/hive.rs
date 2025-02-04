@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::{Add, Mul};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-struct HexCoord(i16, i16, i16);
+pub struct HexCoord(i16, i16, i16);
 
 impl Add for HexCoord {
     type Output = Self;
@@ -178,8 +178,9 @@ impl<T> HexBoard<T> {
         visited
     }
 
-    fn passable_coords(&self, from: HexCoord) -> Vec<HexCoord> {
+    fn passable_coords(&self, from: HexCoord, without: Option<HexCoord>) -> Vec<HexCoord> {
         // return every cell on the perimeter that isn't occupied and isn't impassible
+        // optionally, treat 'without' as an empty cell (so spiders and ants don't block themselves)
         let from_neighbors = from.neighbor_set();
 
         // the destination is passable if:
@@ -192,6 +193,7 @@ impl<T> HexBoard<T> {
             .filter(|c| {
                 c.neighbor_set()
                     .intersection(&from_neighbors)
+                    .filter(|&&x| if let Some(w) = without { x != w } else { true })
                     .filter(|&&x| !self.is_empty(x))
                     .count()
                     == 1
@@ -213,7 +215,8 @@ impl<T> HexBoard<T> {
                     .intersection(&from_neighbors)
                     .filter(|&&x| !self.is_empty(x))
                     .count()
-                    >= 1) || !self.is_empty(c)
+                    >= 1)
+                    || !self.is_empty(c)
             })
             .collect()
     }
@@ -279,7 +282,7 @@ impl<T: Into<char> + Clone + std::fmt::Debug> HexBoard<T> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum HiveBug {
+pub enum HiveBug {
     Queen,
     Beetle,
     Grasshopper,
@@ -288,7 +291,7 @@ enum HiveBug {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct HivePiece {
+pub struct HivePiece {
     color: bool,
     bug: HiveBug,
 }
@@ -318,6 +321,14 @@ impl From<HivePiece> for char {
 }
 
 impl HivePiece {
+    pub fn color(&self) -> bool {
+        self.color
+    }
+
+    pub fn bug(&self) -> HiveBug {
+        self.bug
+    }
+
     fn valid_dests(&self, board: &HexBoard<HivePiece>, coord: HexCoord) -> Vec<HexCoord> {
         use HiveBug::*;
 
@@ -329,7 +340,7 @@ impl HivePiece {
         }
 
         match self.bug {
-            Queen => board.passable_coords(coord),
+            Queen => board.passable_coords(coord, None),
             Beetle => board.passable_climber_coords(coord),
             Grasshopper => {
                 let mut res = Vec::new();
@@ -356,32 +367,32 @@ impl HivePiece {
                 res
             }
             Spider => {
-            	// TODO these spider moves still don't look right
+                // TODO these spider moves still don't look right
                 let one_away: HashSet<HexCoord> =
-                    board.passable_coords(coord).into_iter().collect();
+                    board.passable_coords(coord, None).into_iter().collect();
                 let two_away: HashSet<HexCoord> = one_away
                     .iter()
-                    .flat_map(|&c| board.passable_coords(c))
+                    .flat_map(|&c| board.passable_coords(c, Some(coord)))
                     .filter(|&c| c != coord)
                     .collect();
                 two_away
                     .iter()
-                    .flat_map(|&c| board.passable_coords(c))
+                    .flat_map(|&c| board.passable_coords(c, Some(coord)))
                     .filter(|&c| c != coord)
                     .filter(|c| !one_away.contains(c))
-                    .filter(|&c| board.neighbor_cells(c).filter(|&x| x != coord).count() > 1) // stop spider from climbing off the hive on itself
+                    .filter(|&c| board.neighbor_cells(c).filter(|&x| x != coord).count() != 0) // stop spider from climbing off the hive on itself
                     .collect()
             }
             Ant => {
                 let mut passable: HashSet<HexCoord> =
-                    board.passable_coords(coord).into_iter().collect();
+                    board.passable_coords(coord, None).into_iter().collect();
                 let mut to_explore: Vec<HexCoord> = passable.iter().cloned().collect();
 
                 while let Some(c) = to_explore.pop() {
                     // filtering by c != coord first also stops it from going in passible
                     to_explore.extend(
                         board
-                            .passable_coords(c)
+                            .passable_coords(c, Some(coord))
                             .into_iter()
                             .filter(|&c| c != coord)
                             .filter(|&c| passable.insert(c)),
@@ -391,7 +402,7 @@ impl HivePiece {
                 // gotta filter out moves to its own perimeter (stop ant from wandering off)
                 passable
                     .into_iter()
-                    .filter(|&c| board.neighbor_cells(c).count() > 1)
+                    .filter(|&c| board.neighbor_cells(c).filter(|&x| x != coord).count() != 0) // stop ant from climbing off the hive on itself
                     .collect()
             }
         }
@@ -404,12 +415,21 @@ pub enum HiveMove {
     Move(HivePiece, HexCoord, HexCoord),
 }
 
+impl HiveMove {
+    pub fn piece(&self) -> HivePiece {
+        match self {
+            &HiveMove::Place(p, _) => p,
+            &HiveMove::Move(p, _, _) => p,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum HiveResult {
     Cont(HiveGame),
-    WinW,
-    WinB,
-    Draw,
+    WinW(HiveGame),
+    WinB(HiveGame),
+    Draw(HiveGame),
     Invalid,
 }
 
@@ -417,6 +437,9 @@ impl HiveResult {
     pub fn game(self) -> Option<HiveGame> {
         match self {
             HiveResult::Cont(g) => Some(g),
+            HiveResult::WinW(g) => Some(g),
+            HiveResult::WinB(g) => Some(g),
+            HiveResult::Draw(g) => Some(g),
             _ => None,
         }
     }
@@ -630,9 +653,9 @@ impl HiveGame {
         }
 
         match (res.queen_surrounded(false), res.queen_surrounded(true)) {
-            (true, false) => HiveResult::WinW,
-            (false, true) => HiveResult::WinB,
-            (true, true) => HiveResult::Draw,
+            (true, false) => HiveResult::WinW(res),
+            (false, true) => HiveResult::WinB(res),
+            (true, true) => HiveResult::Draw(res),
             (false, false) => HiveResult::Cont(res),
         }
     }

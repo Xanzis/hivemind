@@ -1,9 +1,11 @@
 mod hive;
 
-fn main() {
-    let mut game = hive::HiveGame::new();
+use hive::{HiveBug, HiveGame, HiveResult};
 
-    for i in 0..200 {
+fn main() {
+    let mut game = HiveGame::new();
+
+    for i in 0..100 {
         //println!("Game state:\n{:?}", game);
         println!("Game disp:\n{}", game.disp());
 
@@ -17,25 +19,36 @@ fn main() {
         let res = game.make_move(next[i]);
 
         match res {
-            hive::HiveResult::Cont(g) => {
+            HiveResult::Cont(g) => {
                 game = g;
-            },
-            hive::HiveResult::WinW => {
+            }
+            HiveResult::WinW(_) => {
                 println!("WinW");
-                break
-            },
-            hive::HiveResult::WinB => {
+                break;
+            }
+            HiveResult::WinB(_) => {
                 println!("WinB");
-                break
-            },
-            hive::HiveResult::Draw => {
+                break;
+            }
+            HiveResult::Draw(_) => {
                 println!("Draw");
-                break
-            },
-            hive::HiveResult::Invalid => {
+                break;
+            }
+            HiveResult::Invalid => {
                 println!("Invalid");
-                break
-            },
+                break;
+            }
+        }
+    }
+
+    let next = game.valid_moves();
+    println!("Game disp:\n{}", game.disp());
+    println!("Spider moves:");
+    for m in next.iter().filter(|m| m.piece().bug() == HiveBug::Spider) {
+        println!("{:?}:", m);
+        let res = game.make_move(*m);
+        if let HiveResult::Cont(g) = res {
+            println!("{}", g.disp_board());
         }
     }
 }
