@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::{Add, Mul};
+use std::mem::MaybeUninit;
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct HexCoord(i16, i16, i16);
@@ -51,27 +53,87 @@ impl HexCoord {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Pile<T: Copy> {
+	i: u8,
+	arr: [MaybeUninit<T>; 5],
+}
+
+impl<T: Copy> Pile<T> {
+	fn new() -> Self {
+		Self {
+			i: 0,
+			arr: [MaybeUninit::uninit(); 5],
+		}
+	}
+
+	fn push(&mut self, item: T) {
+		self.arr[self.i as usize].write(item);
+		self.i += 1;
+	}
+
+	fn pop(&mut self) -> Option<T> {
+		if self.i == 0 {
+			return None
+		}
+
+		self.i -= 1;
+		unsafe {
+			let res = self.arr[self.i as usize].assume_init_read();
+			self.arr[self.i as usize].assume_init_drop();
+			Some(res)
+		}
+	}
+
+	fn len(&self) -> usize {
+		self.i as usize
+	}
+
+	fn last<'a>(&'a self) -> Option<&'a T> {
+		if self.i == 0 {
+			None
+		} else {
+			unsafe {
+				Some(self.arr[(self.i - 1) as usize].assume_init_ref())
+			}
+		}
+	}
+
+	fn is_empty(&self) -> bool {
+		self.i == 0
+	}
+}
+
+impl<T: fmt::Debug + Copy> fmt::Debug for Pile<T> {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+		unsafe {
+			let mut iter = (0..self.i).map(|i| self.arr[i as usize].assume_init_ref());
+			fmt.debug_list().entries(iter).finish()
+		}
+    }
+}
+
 // the vec is kept empty for references to empty cells
 #[derive(Debug, Clone)]
-pub struct HexBoard<T> {
-    map: HashMap<HexCoord, Vec<T>>,
-    empty: Vec<T>,
+pub struct HexBoard<T: Copy> {
+    map: HashMap<HexCoord, Pile<T>>,
+    empty: Pile<T>,
 
     perimeter_cache: Option<HashSet<HexCoord>>,
     occupied_cache: Option<HashSet<HexCoord>>,
 }
 
-impl<T> HexBoard<T> {
+impl<T: Copy> HexBoard<T> {
     fn new() -> Self {
         HexBoard {
             map: HashMap::new(),
-            empty: Vec::new(),
+            empty: Pile::new(),
             perimeter_cache: None,
             occupied_cache: None,
         }
     }
 
-    pub fn get<'a>(&'a self, coord: HexCoord) -> &'a Vec<T> {
+    fn get<'a>(&'a self, coord: HexCoord) -> &'a Pile<T> {
         self.map.get(&coord).unwrap_or(&self.empty)
     }
 
@@ -87,7 +149,7 @@ impl<T> HexBoard<T> {
     }
 
     fn place(&mut self, coord: HexCoord, piece: T) {
-        self.map.entry(coord).or_insert(Vec::new()).push(piece);
+        self.map.entry(coord).or_insert(Pile::new()).push(piece);
 
         self.perimeter_cache = Some(self.find_perimeter());
         self.occupied_cache = Some(self.find_occupied());
@@ -97,7 +159,7 @@ impl<T> HexBoard<T> {
         let mut res = false;
 
         if let Some(piece) = self.map.get_mut(&from).map(|v| v.pop()).flatten() {
-            self.map.entry(to).or_insert(Vec::new()).push(piece);
+            self.map.entry(to).or_insert(Pile::new()).push(piece);
             res = true;
         }
 
@@ -235,7 +297,7 @@ impl<T> HexBoard<T> {
     }
 }
 
-impl<T: Into<char> + Clone + std::fmt::Debug> HexBoard<T> {
+impl<T: Into<char> + Clone + Copy + std::fmt::Debug> HexBoard<T> {
     fn disp(&self) -> String {
         // display as a monospace hex grid
 
