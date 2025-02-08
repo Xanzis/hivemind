@@ -60,6 +60,21 @@ impl HexCoord {
         let v = *self - *other;
         ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2
     }
+
+    pub fn shared_neighbors(&self, other: &Self) -> Option<(Self, Self)> {
+        // return the two shared neighbors of two coords, if any
+        let dir = match *other - *self {
+            HexCoord(1, 0) => (HexCoord(1, -1), HexCoord(0, 1)),
+            HexCoord(0, 1) => (HexCoord(1, 0), HexCoord(-1, 1)),
+            HexCoord(-1, 1) => (HexCoord(0, 1), HexCoord(-1, 0)),
+            HexCoord(-1, 0) => (HexCoord(-1, 1), HexCoord(0, -1)),
+            HexCoord(0, -1) => (HexCoord(-1, 0), HexCoord(1, -1)),
+            HexCoord(1, -1) => (HexCoord(0, -1), HexCoord(1, 0)),
+            _ => return None,
+        };
+
+        Some((*self + dir.0, *self + dir.1))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -241,19 +256,33 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         nb.into_iter().filter_map(|x| self.get_top(x))
     }
 
-    fn reachable_without(&self, from: HexCoord, without: HexCoord) -> HashSet<HexCoord> {
+    fn reachable_without(&self, from: HexCoord, mut to: Vec<HexCoord>, without: HexCoord) -> bool {
+        // starting at from, and not traversing without, can you reach all the coords in to?
         let mut to_check = vec![from];
         let mut visited = HashSet::new();
 
         while let Some(cur) = to_check.pop() {
-            to_check.extend(
-                self.neighbor_cells(cur)
-                    .filter(|&c| c != without)
-                    .filter(|&c| visited.insert(c)),
-            );
+            for nb in self.neighbor_cells(cur) {
+                if nb == without {
+                    continue;
+                }
+
+                if !visited.insert(nb) {
+                    continue;
+                }
+
+                if let Some(i) = to.iter().position(|&x| nb == x) {
+                    to.swap_remove(i);
+                    if to.len() == 0 {
+                        return true;
+                    }
+                }
+
+                to_check.push(nb);
+            }
         }
 
-        visited
+        false
     }
 
     fn passable_coords(&self, from: HexCoord, without: Option<HexCoord>) -> Vec<HexCoord> {
@@ -306,8 +335,24 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             return false;
         }
 
-        let nb = self.neighbor_cells(coord).next().unwrap();
-        self.occupied().len() - self.reachable_without(nb, coord).len() != 1
+        // it's not a bridge if it has only 1 neighbor
+        let mut nbs: Vec<_> = self.neighbor_cells(coord).collect();
+
+        if nbs.len() == 0 {
+            if self.all_top().count() == 1 {
+                return false;
+            } else {
+                panic!("ugh");
+            }
+        }
+
+        if nbs.len() == 1 {
+            return false;
+        }
+
+        let nb = nbs.pop().unwrap();
+        let other_nbs = nbs;
+        !self.reachable_without(nb, other_nbs, coord)
     }
 }
 
