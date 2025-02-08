@@ -17,7 +17,7 @@ impl Add for HexCoord {
 impl Sub for HexCoord {
     type Output = Self;
 
-    fn add(self, other: Self) -> Self {
+    fn sub(self, other: Self) -> Self {
         HexCoord(self.0 - other.0, self.1 - other.1)
     }
 }
@@ -58,7 +58,7 @@ impl HexCoord {
 
     fn dist(&self, other: &Self) -> i8 {
         let v = a - b;
-        ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2;
+        ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2
     }
 }
 
@@ -149,7 +149,7 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         self.get(coord).last()
     }
 
-    fn all_top<'a>(&'a self) -> impl Iterator<Item = (&'a HexCoord, &'a T)> {
+    pub fn all_top<'a>(&'a self) -> impl Iterator<Item = (&'a HexCoord, &'a T)> {
         self.map
             .iter()
             .filter_map(|(x, v)| v.last().map(|p| (x, p)))
