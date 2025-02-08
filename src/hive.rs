@@ -56,8 +56,8 @@ impl HexCoord {
         (row, col)
     }
 
-    fn dist(&self, other: &Self) -> i8 {
-        let v = a - b;
+    pub fn dist(&self, other: &Self) -> i8 {
+        let v = *self - *other;
         ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2
     }
 }
@@ -443,7 +443,6 @@ impl HivePiece {
                 res
             }
             Spider => {
-                // TODO these spider moves still don't look right
                 let one_away: HashSet<HexCoord> =
                     board.passable_coords(coord, None).into_iter().collect();
                 let two_away: HashSet<HexCoord> = one_away
