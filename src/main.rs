@@ -5,36 +5,9 @@ use hive::{HiveBug, HiveGame, HiveResult};
 
 fn main() {
     let mut game = HiveGame::new();
-    println!("Game disp:\n{}", game.disp());
+    println!("\nGame state:\n{}", game.disp());
 
     for i in 0..100 {
-        let next = player::random(game.clone());
-        let res = game.make_move(next);
-
-        match res {
-            HiveResult::Cont(g) => {
-                game = g;
-            }
-            HiveResult::WinW(_) => {
-                println!("WinW");
-                break;
-            }
-            HiveResult::WinB(_) => {
-                println!("WinB");
-                break;
-            }
-            HiveResult::Draw(_) => {
-                println!("Draw");
-                break;
-            }
-            HiveResult::Invalid => {
-                println!("Invalid");
-                break;
-            }
-        }
-
-        println!("Game disp:\n{}", game.disp());
-
         let next = player::search(game.clone());
         let res = game.make_move(next);
 
@@ -42,16 +15,46 @@ fn main() {
             HiveResult::Cont(g) => {
                 game = g;
             }
-            HiveResult::WinW(_) => {
-                println!("WinW");
+            HiveResult::WinW(g) => {
+                println!("WinW with:\n{}", g.disp_board());
                 break;
             }
-            HiveResult::WinB(_) => {
-                println!("WinB");
+            HiveResult::WinB(g) => {
+                println!("WinB with:\n{}", g.disp_board());
                 break;
             }
-            HiveResult::Draw(_) => {
-                println!("Draw");
+            HiveResult::Draw(g) => {
+                println!("Draw with:\n{}", g.disp_board());
+                break;
+            }
+            HiveResult::Invalid => {
+                println!("Invalid");
+                break;
+            }
+        }
+
+        println!("\nGame state:\n{}", game.disp());
+        println!("Possible next moves: {}", game.valid_moves().iter().count());
+        //println!("Board occupied:\n{}", game.board().disp_occupied());
+        //println!("Board perimeter:\n{}", game.board().disp_perimeter());
+
+        let next = player::swarm(game.clone());
+        let res = game.make_move(next);
+
+        match res {
+            HiveResult::Cont(g) => {
+                game = g;
+            }
+            HiveResult::WinW(g) => {
+                println!("WinW with:\n{}", g.disp_board());
+                break;
+            }
+            HiveResult::WinB(g) => {
+                println!("WinB with:\n{}", g.disp_board());
+                break;
+            }
+            HiveResult::Draw(g) => {
+                println!("Draw with:\n{}", g.disp_board());
                 break;
             }
             HiveResult::Invalid => {
@@ -61,5 +64,7 @@ fn main() {
         }
 
         println!("Game disp:\n{}", game.disp());
+        //println!("Board occupied:\n{}", game.board().disp_occupied());
+        //println!("Board perimeter:\n{}", game.board().disp_perimeter());
     }
 }
