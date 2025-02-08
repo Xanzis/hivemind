@@ -1,115 +1,122 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::{Add, Mul};
-use std::mem::MaybeUninit;
 use std::fmt;
+use std::mem::MaybeUninit;
+use std::ops::{Add, Mul, Sub};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct HexCoord(i16, i16, i16);
+pub struct HexCoord(i8, i8);
 
 impl Add for HexCoord {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        HexCoord(self.0 + other.0, self.1 + other.1, self.2 + other.2)
+        HexCoord(self.0 + other.0, self.1 + other.1)
     }
 }
 
-impl Mul<i16> for HexCoord {
+impl Sub for HexCoord {
     type Output = Self;
 
-    fn mul(self, other: i16) -> Self {
-        HexCoord(self.0 * other, self.1 * other, self.2 * other)
+    fn add(self, other: Self) -> Self {
+        HexCoord(self.0 - other.0, self.1 - other.1)
+    }
+}
+
+impl Mul<i8> for HexCoord {
+    type Output = Self;
+
+    fn mul(self, other: i8) -> Self {
+        HexCoord(self.0 * other, self.1 * other)
     }
 }
 
 const HEXDIR: [HexCoord; 6] = [
-    HexCoord(1, -1, 0),
-    HexCoord(1, 0, -1),
-    HexCoord(0, 1, -1),
-    HexCoord(-1, 1, 0),
-    HexCoord(-1, 0, 1),
-    HexCoord(0, -1, 1),
+    HexCoord(1, -1),
+    HexCoord(1, 0),
+    HexCoord(0, 1),
+    HexCoord(-1, 1),
+    HexCoord(-1, 0),
+    HexCoord(0, -1),
 ];
 
 impl HexCoord {
     fn origin() -> Self {
-        HexCoord(0, 0, 0)
+        HexCoord(0, 0)
     }
 
     fn neighbors<'a>(&'a self) -> impl Iterator<Item = Self> + 'a {
         HEXDIR.iter().map(|&x| x + *self)
     }
 
-    fn neighbor_set(&self) -> HashSet<HexCoord> {
-        self.neighbors().collect()
-    }
-
-    fn to_offset(&self) -> (i16, i16) {
+    fn to_offset(&self) -> (i8, i8) {
         // convert to row/column offset coordinates
 
         let col = self.0 + (self.1 - (self.1 & 1)) / 2;
         let row = self.1;
         (row, col)
     }
+
+    fn dist(&self, other: &Self) -> i8 {
+        let v = a - b;
+        ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2;
+    }
 }
 
 #[derive(Clone, Copy)]
 struct Pile<T: Copy> {
-	i: u8,
-	arr: [MaybeUninit<T>; 5],
+    i: u8,
+    arr: [MaybeUninit<T>; 5],
 }
 
 impl<T: Copy> Pile<T> {
-	fn new() -> Self {
-		Self {
-			i: 0,
-			arr: [MaybeUninit::uninit(); 5],
-		}
-	}
+    fn new() -> Self {
+        Self {
+            i: 0,
+            arr: [MaybeUninit::uninit(); 5],
+        }
+    }
 
-	fn push(&mut self, item: T) {
-		self.arr[self.i as usize].write(item);
-		self.i += 1;
-	}
+    fn push(&mut self, item: T) {
+        self.arr[self.i as usize].write(item);
+        self.i += 1;
+    }
 
-	fn pop(&mut self) -> Option<T> {
-		if self.i == 0 {
-			return None
-		}
+    fn pop(&mut self) -> Option<T> {
+        if self.i == 0 {
+            return None;
+        }
 
-		self.i -= 1;
-		unsafe {
-			let res = self.arr[self.i as usize].assume_init_read();
-			self.arr[self.i as usize].assume_init_drop();
-			Some(res)
-		}
-	}
+        self.i -= 1;
+        unsafe {
+            let res = self.arr[self.i as usize].assume_init_read();
+            self.arr[self.i as usize].assume_init_drop();
+            Some(res)
+        }
+    }
 
-	fn len(&self) -> usize {
-		self.i as usize
-	}
+    fn len(&self) -> usize {
+        self.i as usize
+    }
 
-	fn last<'a>(&'a self) -> Option<&'a T> {
-		if self.i == 0 {
-			None
-		} else {
-			unsafe {
-				Some(self.arr[(self.i - 1) as usize].assume_init_ref())
-			}
-		}
-	}
+    fn last<'a>(&'a self) -> Option<&'a T> {
+        if self.i == 0 {
+            None
+        } else {
+            unsafe { Some(self.arr[(self.i - 1) as usize].assume_init_ref()) }
+        }
+    }
 
-	fn is_empty(&self) -> bool {
-		self.i == 0
-	}
+    fn is_empty(&self) -> bool {
+        self.i == 0
+    }
 }
 
 impl<T: fmt::Debug + Copy> fmt::Debug for Pile<T> {
-	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-		unsafe {
-			let mut iter = (0..self.i).map(|i| self.arr[i as usize].assume_init_ref());
-			fmt.debug_list().entries(iter).finish()
-		}
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unsafe {
+            let mut iter = (0..self.i).map(|i| self.arr[i as usize].assume_init_ref());
+            fmt.debug_list().entries(iter).finish()
+        }
     }
 }
 
@@ -119,17 +126,17 @@ pub struct HexBoard<T: Copy> {
     map: HashMap<HexCoord, Pile<T>>,
     empty: Pile<T>,
 
-    perimeter_cache: Option<HashSet<HexCoord>>,
-    occupied_cache: Option<HashSet<HexCoord>>,
+    perimeter: HashSet<HexCoord>,
+    occupied: HashSet<HexCoord>,
 }
 
-impl<T: Copy> HexBoard<T> {
+impl<T: Copy + fmt::Debug> HexBoard<T> {
     fn new() -> Self {
         HexBoard {
             map: HashMap::new(),
             empty: Pile::new(),
-            perimeter_cache: None,
-            occupied_cache: None,
+            perimeter: HashSet::new(),
+            occupied: HashSet::new(),
         }
     }
 
@@ -149,70 +156,79 @@ impl<T: Copy> HexBoard<T> {
     }
 
     fn place(&mut self, coord: HexCoord, piece: T) {
+        if !self.is_empty(coord) {
+            println!("bad board state:\n{:?}", self);
+            panic!("aaa");
+        }
+
         self.map.entry(coord).or_insert(Pile::new()).push(piece);
 
-        self.perimeter_cache = Some(self.find_perimeter());
-        self.occupied_cache = Some(self.find_occupied());
+        let nb: Vec<_> = self.neighbor_space(coord).collect();
+        self.perimeter.extend(nb);
+        self.perimeter.remove(&coord);
+        self.occupied.insert(coord);
     }
 
     fn mov(&mut self, from: HexCoord, to: HexCoord) -> bool {
-        let mut res = false;
-
         if let Some(piece) = self.map.get_mut(&from).map(|v| v.pop()).flatten() {
             self.map.entry(to).or_insert(Pile::new()).push(piece);
-            res = true;
+
+            let dead_nb: Vec<_> = self
+                .neighbor_space(from)
+                .filter(|&x| self.neighbor_cells(x).count() == 0)
+                .collect();
+            for nb in dead_nb {
+                self.perimeter.remove(&nb);
+            }
+
+            if self.is_empty(from) {
+                // might not be if a beetle is leaving a pile
+                self.perimeter.insert(from);
+                self.occupied.remove(&from);
+            }
+
+            let nb: Vec<_> = self.neighbor_space(to).collect();
+            self.perimeter.extend(nb);
+            self.perimeter.remove(&to);
+            self.occupied.insert(to);
+
+            true
+        } else {
+            false
         }
-
-        self.perimeter_cache = Some(self.find_perimeter());
-        self.occupied_cache = Some(self.find_occupied());
-
-        res
     }
 
     fn is_empty(&self, coord: HexCoord) -> bool {
         self.map.get(&coord).map(|v| v.is_empty()).unwrap_or(true)
     }
 
-    pub fn perimeter(&self) -> HashSet<HexCoord> {
-        if let Some(p) = self.perimeter_cache.clone() {
-            p
-        } else {
-            self.find_perimeter()
-        }
+    pub fn perimeter(&self) -> &HashSet<HexCoord> {
+        &self.perimeter
     }
 
-    fn find_perimeter(&self) -> HashSet<HexCoord> {
-        let mut res = HashSet::new();
-
-        for &coord in self.map.keys() {
-            if self.is_empty(coord) {
-                continue;
-            }
-
-            for neighbor in coord.neighbors() {
-                if self.is_empty(neighbor) {
-                    res.insert(neighbor);
-                }
-            }
-        }
-
-        res
+    pub fn occupied(&self) -> &HashSet<HexCoord> {
+        &self.occupied
     }
 
-    pub fn occupied(&self) -> HashSet<HexCoord> {
-        if let Some(o) = self.occupied_cache.clone() {
-            o
-        } else {
-            self.find_occupied()
+    pub fn disp_perimeter(&self) -> String {
+        let mut res: HexBoard<char> = HexBoard::new();
+        for &c in self.perimeter() {
+            res.place(c, 'P');
         }
+        res.disp()
     }
 
-    fn find_occupied(&self) -> HashSet<HexCoord> {
-        let mut res = HashSet::new();
+    pub fn disp_occupied(&self) -> String {
+        let mut res: HexBoard<char> = HexBoard::new();
+        for &c in self.occupied() {
+            res.place(c, 'O');
+        }
+        res.disp()
+    }
 
-        res.extend(self.map.keys().filter(|&&c| !self.is_empty(c)));
-
-        res
+    pub fn neighbor_space<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = HexCoord> + 'a {
+        let nb: Vec<_> = coord.neighbors().collect();
+        nb.into_iter().filter(|&x| self.is_empty(x))
     }
 
     pub fn neighbor_cells<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = HexCoord> + 'a {
@@ -243,7 +259,6 @@ impl<T: Copy> HexBoard<T> {
     fn passable_coords(&self, from: HexCoord, without: Option<HexCoord>) -> Vec<HexCoord> {
         // return every cell on the perimeter that isn't occupied and isn't impassible
         // optionally, treat 'without' as an empty cell (so spiders and ants don't block themselves)
-        let from_neighbors = from.neighbor_set();
 
         // the destination is passable if:
         // - the dest is not occupied
@@ -253,10 +268,10 @@ impl<T: Copy> HexBoard<T> {
         from.neighbors()
             .filter(|c| !self.occupied().contains(c))
             .filter(|c| {
-                c.neighbor_set()
-                    .intersection(&from_neighbors)
-                    .filter(|&&x| if let Some(w) = without { x != w } else { true })
-                    .filter(|&&x| !self.is_empty(x))
+                c.neighbors()
+                    .filter(|&x| from.neighbors().any(|y| x == y))
+                    .filter(|&x| if let Some(w) = without { x != w } else { true })
+                    .filter(|&x| !self.is_empty(x))
                     .count()
                     == 1
             })
@@ -265,7 +280,6 @@ impl<T: Copy> HexBoard<T> {
 
     fn passable_climber_coords(&self, from: HexCoord) -> Vec<HexCoord> {
         // return cells passable to climbers
-        let from_neighbors = from.neighbor_set();
 
         // the destination is passable if:
         // - the source and dest share one or two populated neighbor cells, or the dest is populated
@@ -273,9 +287,9 @@ impl<T: Copy> HexBoard<T> {
         //   - unless the dest is populated, in which case the dest has not left the hive
         from.neighbors()
             .filter(|&c| {
-                (c.neighbor_set()
-                    .intersection(&from_neighbors)
-                    .filter(|&&x| !self.is_empty(x))
+                (c.neighbors()
+                    .filter(|&x| from.neighbors().any(|y| x == y))
+                    .filter(|&x| !self.is_empty(x))
                     .count()
                     >= 1)
                     || !self.is_empty(c)
@@ -305,7 +319,7 @@ impl<T: Into<char> + Clone + Copy + std::fmt::Debug> HexBoard<T> {
             return String::new();
         }
 
-        let map_offset: HashMap<(i16, i16), Option<T>> = self
+        let map_offset: HashMap<(i8, i8), Option<T>> = self
             .map
             .clone()
             .into_iter()
