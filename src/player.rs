@@ -82,7 +82,7 @@ pub fn swarm(game: HiveGame) -> HiveMove {
             let v = (v * 50) / (own_piece_count + 1);
 
             // subtract a bonus for placing more pieces
-            let v = v - 5 * own_piece_count;
+            let v = v - 10 * own_piece_count;
 
             if v < value {
                 value = v;
@@ -202,30 +202,47 @@ fn search_val(game: &HiveGame, color: bool) -> i32 {
     // queen surrounded is bad
     if let Some(l) = own_queen {
         // queen surrounded is bad
-        res -= board.neighbor_cells(l).count().pow(2) as i32;
+        res -= (board.neighbor_cells(l).count().pow(2) * 10) as i32;
 
         //beetles neighboring queen is bad
         res -= (board
             .neighbor_pieces(l)
             .filter(|p| p.bug() == HiveBug::Beetle)
             .count()
-            * 2) as i32;
+            * 50) as i32;
+
+        if board.get_top(l).unwrap().bug() == HiveBug::Beetle {
+            res += 10;
+        }
     }
 
     if let Some(l) = opp_queen {
         // other queen surrounded is good
-        res += board.neighbor_cells(l).count().pow(2) as i32;
+        res += (board.neighbor_cells(l).count().pow(2) * 12) as i32;
 
         //beetles neighboring other queen is good
         res += (board
             .neighbor_pieces(l)
             .filter(|p| p.bug() == HiveBug::Beetle)
             .count()
-            * 2) as i32;
+            * 60) as i32;
 
-        //what the heck, beetle on the other queen is good
+        // what the heck, beetle on the other queen is good
         if board.get_top(l).unwrap().bug() == HiveBug::Beetle {
-            res += 3;
+            res += 10;
+        }
+    }
+
+    // own pieces not being bridges is good (freer to move)
+    for (&c, &p) in board.all_top() {
+        if p.color() == color {
+            if !board.is_bridge(c) {
+                res += 2;
+
+                if p.bug() == HiveBug::Ant {
+                    res += 2;
+                }
+            }
         }
     }
 

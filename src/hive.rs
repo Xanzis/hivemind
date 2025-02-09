@@ -285,7 +285,11 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         false
     }
 
-    fn passable_coords(&self, from: HexCoord, without: Option<HexCoord>) -> Vec<HexCoord> {
+    fn passable_coords<'a>(
+        &'a self,
+        from: HexCoord,
+        without: Option<HexCoord>,
+    ) -> impl Iterator<Item = HexCoord> + 'a {
         // return every cell on the perimeter that isn't occupied and isn't impassible
         // optionally, treat 'without' as an empty cell (so spiders and ants don't block themselves)
 
@@ -294,17 +298,16 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         // - the source and dest share exactly one populated neighbor cell
         //   - 0 and the dest has hopped a peninsula or left the hive
         //   - 2 and the passage is blocked
-        from.neighbors()
-            .filter(|c| !self.occupied().contains(c))
-            .filter(|c| {
-                c.neighbors()
-                    .filter(|&x| from.neighbors().any(|y| x == y))
-                    .filter(|&x| if let Some(w) = without { x != w } else { true })
-                    .filter(|&x| !self.is_empty(x))
-                    .count()
-                    == 1
-            })
-            .collect()
+        self.neighbor_space(from).filter(move |to| {
+            let (nb1, nb2) = to.shared_neighbors(&from).unwrap();
+            if let Some(w) = without {
+                let nb1_is_empty = self.is_empty(nb1) || (nb1 == w);
+                let nb2_is_empty = self.is_empty(nb2) || (nb2 == w);
+                nb1_is_empty ^ nb2_is_empty
+            } else {
+                self.is_empty(nb1) ^ self.is_empty(nb2)
+            }
+        })
     }
 
     fn passable_climber_coords(&self, from: HexCoord) -> Vec<HexCoord> {
@@ -326,7 +329,7 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             .collect()
     }
 
-    fn is_bridge(&self, coord: HexCoord) -> bool {
+    pub fn is_bridge(&self, coord: HexCoord) -> bool {
         // if the piece is not a bridge between disjoint hives the number of cells reachable
         // from one of its neighbors (minus the piece in question) should be occupied-1
 
@@ -461,7 +464,7 @@ impl HivePiece {
         }
 
         match self.bug {
-            Queen => board.passable_coords(coord, None),
+            Queen => board.passable_coords(coord, None).collect(),
             Beetle => board.passable_climber_coords(coord),
             Grasshopper => {
                 let mut res = Vec::new();
@@ -488,8 +491,7 @@ impl HivePiece {
                 res
             }
             Spider => {
-                let one_away: HashSet<HexCoord> =
-                    board.passable_coords(coord, None).into_iter().collect();
+                let one_away: HashSet<HexCoord> = board.passable_coords(coord, None).collect();
                 let two_away: HashSet<HexCoord> = one_away
                     .iter()
                     .flat_map(|&c| board.passable_coords(c, Some(coord)))
@@ -504,18 +506,22 @@ impl HivePiece {
                     .collect()
             }
             Ant => {
-                let mut passable: HashSet<HexCoord> =
-                    board.passable_coords(coord, None).into_iter().collect();
-                let mut to_explore: Vec<HexCoord> = passable.iter().cloned().collect();
+                let mut passable: HashSet<HexCoord> = board.passable_coords(coord, None).collect();
 
-                while let Some(c) = to_explore.pop() {
+                // to_explore includes the originating node (second element) for to avoid hashset lookup on backtrack
+                let mut to_explore: Vec<(HexCoord, HexCoord)> =
+                    passable.iter().cloned().map(|c| (c, coord)).collect();
+
+                while let Some((cur, from)) = to_explore.pop() {
                     // filtering by c != coord first also stops it from going in passible
+                    // filtering by c != from catches some backtracking before incurring a hashset lookup
                     to_explore.extend(
                         board
-                            .passable_coords(c, Some(coord))
-                            .into_iter()
+                            .passable_coords(cur, Some(coord))
                             .filter(|&c| c != coord)
-                            .filter(|&c| passable.insert(c)),
+                            .filter(|&c| c != from)
+                            .filter(|&c| passable.insert(c))
+                            .map(|c| (c, cur)),
                     );
                 }
 
