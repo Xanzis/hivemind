@@ -1,119 +1,31 @@
+use super::Player;
 use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
 
-pub fn random(game: HiveGame) -> HiveMove {
-    let moves = game.valid_moves();
-    let i = (9087901 + game.round()) % moves.len();
-    moves[i]
-}
+#[derive(Default)]
+pub struct SearchPlayer();
 
-pub fn min_move(game: HiveGame) -> HiveMove {
-    // minimize opponent's next moves
-    let moves = game.valid_moves();
+impl Player for SearchPlayer {
+    fn make_move(&mut self, game: HiveGame) -> HiveMove {
+        let own_color = game.turn();
 
-    moves
-        .into_iter()
-        .min_by_key(|&m| {
-            let res = game.make_move(m);
-            if let Some(g) = res.game() {
-                g.valid_moves().len()
-            } else {
-                0
-            }
-        })
-        .unwrap()
-}
+        let mut nodes: u32 = 0;
 
-pub fn min_queen_move(game: HiveGame) -> HiveMove {
-    let moves = game.valid_moves();
+        let res = eval_search(
+            HiveResult::Cont(game),
+            3,
+            i32::MIN,
+            i32::MAX,
+            own_color,
+            &mut nodes,
+        );
 
-    moves
-        .into_iter()
-        .min_by_key(|&m| {
-            let res = game.make_move(m);
-            if let Some(g) = res.game() {
-                let opp_moves = g.valid_moves();
-                opp_moves
-                    .into_iter()
-                    .filter(|x| x.piece().map(|p| p.bug()) == Some(HiveBug::Queen))
-                    .count()
-            } else {
-                0
-            }
-        })
-        .unwrap()
-}
+        println!("Processed {} nodes, value {}", nodes, res.0);
 
-pub fn swarm(game: HiveGame) -> HiveMove {
-    let moves = game.valid_moves();
-    let own_color = game.turn();
-
-    let mut value = i32::MAX;
-    let mut mov = moves[0];
-
-    let opp_queen = if let Some(l) = game.queen_loc(!own_color) {
-        l
-    } else {
-        return mov;
-    };
-
-    for m in moves {
-        let res = game.make_move(m);
-        if let Some(g) = res.game() {
-            // mean square distance to opp queen times 50
-            let v: i32 = g
-                .board()
-                .all_top()
-                .filter_map(|(x, p)| {
-                    if p.color() == own_color {
-                        Some(x.dist(&opp_queen) as i32)
-                    } else {
-                        None
-                    }
-                })
-                .map(|d| d.pow(2))
-                .sum();
-
-            let own_piece_count = g
-                .board()
-                .all_top()
-                .filter(|(_, p)| p.color() == own_color)
-                .count() as i32;
-
-            let v = (v * 50) / (own_piece_count + 1);
-
-            // subtract a bonus for placing more pieces
-            let v = v - 10 * own_piece_count;
-
-            if v < value {
-                value = v;
-                mov = m;
-            }
-        }
+        res.1
     }
-
-    mov
 }
 
-pub fn search(game: HiveGame) -> HiveMove {
-    let own_color = game.turn();
-
-    let mut nodes: u32 = 0;
-
-    let res = eval_search(
-        HiveResult::Cont(game),
-        3,
-        i32::MIN,
-        i32::MAX,
-        own_color,
-        &mut nodes,
-    );
-
-    println!("Processed {} nodes, value {}", nodes, res.0);
-
-    res.1
-}
-
-pub fn eval_search(
+fn eval_search(
     res: HiveResult,
     depth: usize,
     mut alpha: i32,

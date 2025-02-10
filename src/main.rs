@@ -2,13 +2,17 @@ mod hive;
 mod player;
 
 use hive::{HiveBug, HiveGame, HiveResult};
+use player::Player;
 
 fn main() {
+    let mut player1 = player::search::SearchPlayer::default();
+    let mut player2 = player::min_move::MinMovePlayer::default();
+
     let mut game = HiveGame::new();
     println!("\nGame state:\n{}", game.disp());
 
     for i in 0..100 {
-        let next = player::search(game.clone());
+        let next = player1.make_move(game.clone());
         let res = game.make_move(next);
 
         match res {
@@ -38,7 +42,7 @@ fn main() {
         //println!("Board occupied:\n{}", game.board().disp_occupied());
         //println!("Board perimeter:\n{}", game.board().disp_perimeter());
 
-        let next = player::min_move(game.clone());
+        let next = player2.make_move(game.clone());
         let res = game.make_move(next);
 
         match res {
