@@ -38,7 +38,7 @@ fn main() {
         //println!("Board occupied:\n{}", game.board().disp_occupied());
         //println!("Board perimeter:\n{}", game.board().disp_perimeter());
 
-        let next = player::swarm(game.clone());
+        let next = player::min_move(game.clone());
         let res = game.make_move(next);
 
         match res {

@@ -151,7 +151,12 @@ pub fn eval_search(
         // maximizing player
         let mut value = i32::MIN;
         let mut mov = HiveMove::Pass;
-        for m in game.valid_moves() {
+
+        // sort by heuristic value for better pruning
+        let mut moves = game.valid_moves();
+        moves.sort_by_cached_key(|&m| -1 * search_val(&game.make_move(m).game().unwrap(), color));
+
+        for m in moves {
             let node_val =
                 eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes).0 - 1;
 
@@ -171,7 +176,12 @@ pub fn eval_search(
         // minimizing player
         let mut value = i32::MAX;
         let mut mov = HiveMove::Pass;
-        for m in game.valid_moves() {
+
+        // sort by heuristic value for better pruning
+        let mut moves = game.valid_moves();
+        moves.sort_by_cached_key(|&m| search_val(&game.make_move(m).game().unwrap(), color));
+
+        for m in moves {
             let node_val =
                 eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes).0 - 1;
 
