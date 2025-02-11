@@ -550,6 +550,38 @@ impl HiveMove {
             &HiveMove::Pass => None,
         }
     }
+
+    pub fn dest(&self) -> Option<HexCoord> {
+        match self {
+            &HiveMove::Place(_, c) => Some(c),
+            &HiveMove::Move(_, _, c) => Some(c),
+            &HiveMove::Pass => None,
+        }
+    }
+
+    pub fn is_place(&self) -> bool {
+        match self {
+            &HiveMove::Place(_, _) => true,
+            &HiveMove::Move(_, _, _) => false,
+            &HiveMove::Pass => false,
+        }
+    }
+
+    pub fn is_move(&self) -> bool {
+        match self {
+            &HiveMove::Place(_, _) => false,
+            &HiveMove::Move(_, _, _) => true,
+            &HiveMove::Pass => false,
+        }
+    }
+
+    pub fn is_pass(&self) -> bool {
+        match self {
+            &HiveMove::Place(_, _) => false,
+            &HiveMove::Move(_, _, _) => false,
+            &HiveMove::Pass => true,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -681,9 +713,7 @@ impl HiveGame {
             res.extend(dests.into_iter().map(|d| HiveMove::Move(p, c, d)));
         }
 
-        if res.len() == 0 {
-            res.push(HiveMove::Pass);
-        }
+        res.push(HiveMove::Pass);
 
         res
     }
