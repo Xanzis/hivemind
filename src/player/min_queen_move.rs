@@ -2,9 +2,9 @@ use super::Player;
 use crate::hive::{HiveBug, HiveGame, HiveMove};
 
 #[derive(Default)]
-pub struct MinQueenMovePlayer();
+pub struct MinQueenMove();
 
-impl Player for MinQueenMovePlayer {
+impl Player for MinQueenMove {
     fn make_move(&mut self, game: HiveGame) -> HiveMove {
         let moves = game.valid_moves();
 

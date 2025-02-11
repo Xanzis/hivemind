@@ -2,9 +2,9 @@ use super::Player;
 use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
 
 #[derive(Default)]
-pub struct SearchPlayer();
+pub struct Search();
 
-impl Player for SearchPlayer {
+impl Player for Search {
     fn make_move(&mut self, game: HiveGame) -> HiveMove {
         let own_color = game.turn();
 

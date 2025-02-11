@@ -2,9 +2,9 @@ use super::Player;
 use crate::hive::{HiveGame, HiveMove};
 
 #[derive(Default)]
-pub struct MinMovePlayer();
+pub struct MinMove();
 
-impl Player for MinMovePlayer {
+impl Player for MinMove {
     fn make_move(&mut self, game: HiveGame) -> HiveMove {
         // minimize opponent's next moves
         let moves = game.valid_moves();

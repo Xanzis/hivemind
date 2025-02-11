@@ -5,8 +5,8 @@ use hive::{HiveBug, HiveGame, HiveResult};
 use player::Player;
 
 fn main() {
-    let mut player1 = player::search::SearchPlayer::default();
-    let mut player2 = player::min_move::MinMovePlayer::default();
+    let mut player1 = player::search::Search::default();
+    let mut player2 = player::min_move::MinMove::default();
 
     let mut game = HiveGame::new();
     println!("\nGame state:\n{}", game.disp());

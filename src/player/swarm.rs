@@ -2,9 +2,9 @@ use super::Player;
 use crate::hive::{HiveGame, HiveMove};
 
 #[derive(Default)]
-pub struct SwarmPlayer();
+pub struct Swarm();
 
-impl Player for SwarmPlayer {
+impl Player for Swarm {
     fn make_move(&mut self, game: HiveGame) -> HiveMove {
         let moves = game.valid_moves();
         let own_color = game.turn();
