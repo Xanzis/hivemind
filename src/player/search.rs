@@ -19,7 +19,7 @@ impl Player for Search {
             &mut nodes,
         );
 
-        println!("Processed {} nodes, value {}", nodes, res.0);
+        println!("Search processed {} nodes, value {}", nodes, res.0);
 
         res.1
     }
@@ -69,8 +69,9 @@ fn eval_search(
         moves.sort_by_cached_key(|&m| -1 * search_val(&game.make_move(m).game().unwrap(), color));
 
         for m in moves {
-            let node_val =
-                eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes).0 - 1;
+            let node_val = eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes)
+                .0
+                .saturating_sub(1);
 
             if node_val > value {
                 value = node_val;
@@ -94,8 +95,9 @@ fn eval_search(
         moves.sort_by_cached_key(|&m| search_val(&game.make_move(m).game().unwrap(), color));
 
         for m in moves {
-            let node_val =
-                eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes).0 - 1;
+            let node_val = eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes)
+                .0
+                .saturating_sub(1);
 
             if node_val < value {
                 value = node_val;
