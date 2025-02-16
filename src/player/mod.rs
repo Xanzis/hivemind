@@ -1,5 +1,6 @@
 use crate::hive::{HiveGame, HiveMove};
 
+pub mod antman;
 pub mod min_move;
 pub mod min_queen_move;
 pub mod multisearch;
