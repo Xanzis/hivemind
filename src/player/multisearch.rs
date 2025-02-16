@@ -55,7 +55,7 @@ fn eval_search(
         _ => panic!("eek"),
     };
 
-    if depth >= 3 {
+    if depth >= 5 {
         return (search_val(&game, color), HiveMove::Pass);
     }
 
@@ -152,7 +152,7 @@ fn moves_to_search(game: &HiveGame, depth: usize, color: bool) -> Vec<HiveMove> 
         }
 
         // stop adding lower-value moves farther down the tree
-        if depth > 2 {
+        if depth > 3 {
             continue;
         }
 

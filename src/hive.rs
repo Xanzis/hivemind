@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem::MaybeUninit;
 use std::ops::{Add, Mul, Sub};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HexCoord(i8, i8);
 
 impl Add for HexCoord {
@@ -123,6 +124,17 @@ impl<T: Copy> Pile<T> {
 
     fn is_empty(&self) -> bool {
         self.i == 0
+    }
+}
+
+impl<T: Hash + Copy> Hash for Pile<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.i.hash(state);
+        for x in 0..self.i {
+            unsafe {
+                self.arr[x as usize].assume_init_ref().hash(state);
+            }
+        }
     }
 }
 
@@ -414,7 +426,7 @@ pub enum HiveBug {
     Ant,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash)]
 pub struct HivePiece {
     color: bool,
     bug: HiveBug,
@@ -584,7 +596,7 @@ impl HiveMove {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum HiveResult {
     Cont(HiveGame),
     WinW(HiveGame),
@@ -843,3 +855,30 @@ impl HiveGame {
         }
     }
 }
+
+impl Hash for HiveGame {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.round.hash(state);
+        self.turn.hash(state);
+
+        let mut board_map: Vec<_> = self.board.map.iter().collect();
+        board_map.sort_by(|a, b| a.0.cmp(b.0));
+        board_map.hash(state);
+    }
+}
+
+impl PartialEq for HiveGame {
+    fn eq(&self, other: &Self) -> bool {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        let self_hash = hasher.finish();
+
+        let mut hasher = DefaultHasher::new();
+        other.hash(&mut hasher);
+        let other_hash = hasher.finish();
+
+        self_hash == other_hash
+    }
+}
+
+impl Eq for HiveGame {}
