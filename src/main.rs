@@ -5,7 +5,7 @@ use hive::{HiveBug, HiveGame, HiveResult};
 use player::Player;
 
 fn main() {
-    let mut player1 = player::multisearch::MultiSearch::default();
+    let mut player1 = player::antman::AntMan::default();
     let mut player2 = player::search::Search::default();
 
     let mut game = HiveGame::new();
