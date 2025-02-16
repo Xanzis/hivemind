@@ -4,6 +4,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem::MaybeUninit;
 use std::ops::{Add, Mul, Sub};
 
+use rustc_hash::{FxHashMap, FxHashSet};
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HexCoord(i8, i8);
 
@@ -150,20 +152,20 @@ impl<T: fmt::Debug + Copy> fmt::Debug for Pile<T> {
 // the vec is kept empty for references to empty cells
 #[derive(Debug, Clone)]
 pub struct HexBoard<T: Copy> {
-    map: HashMap<HexCoord, Pile<T>>,
+    map: FxHashMap<HexCoord, Pile<T>>,
     empty: Pile<T>,
 
-    perimeter: HashSet<HexCoord>,
-    occupied: HashSet<HexCoord>,
+    perimeter: FxHashSet<HexCoord>,
+    occupied: FxHashSet<HexCoord>,
 }
 
 impl<T: Copy + fmt::Debug> HexBoard<T> {
     fn new() -> Self {
         HexBoard {
-            map: HashMap::new(),
+            map: FxHashMap::default(),
             empty: Pile::new(),
-            perimeter: HashSet::new(),
-            occupied: HashSet::new(),
+            perimeter: FxHashSet::default(),
+            occupied: FxHashSet::default(),
         }
     }
 
@@ -229,11 +231,11 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         self.map.get(&coord).map(|v| v.is_empty()).unwrap_or(true)
     }
 
-    pub fn perimeter(&self) -> &HashSet<HexCoord> {
+    pub fn perimeter(&self) -> &FxHashSet<HexCoord> {
         &self.perimeter
     }
 
-    pub fn occupied(&self) -> &HashSet<HexCoord> {
+    pub fn occupied(&self) -> &FxHashSet<HexCoord> {
         &self.occupied
     }
 
@@ -521,8 +523,8 @@ impl HivePiece {
                 let mut passable: HashSet<HexCoord> = board.passable_coords(coord, None).collect();
 
                 // to_explore includes the originating node (second element) for to avoid hashset lookup on backtrack
-                let mut to_explore: Vec<(HexCoord, HexCoord)> =
-                    passable.iter().cloned().map(|c| (c, coord)).collect();
+                let mut to_explore: Vec<(HexCoord, HexCoord)> = Vec::with_capacity(board.map.len());
+                to_explore.extend(passable.iter().cloned().map(|c| (c, coord)));
 
                 while let Some((cur, from)) = to_explore.pop() {
                     // filtering by c != coord first also stops it from going in passible
@@ -548,50 +550,57 @@ impl HivePiece {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum HiveMove {
+enum MoveInner {
     Place(HivePiece, HexCoord),
     Move(HivePiece, HexCoord, HexCoord),
     Pass,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HiveMove(MoveInner);
+
 impl HiveMove {
+    pub fn pass() -> Self {
+        Self(MoveInner::Pass)
+    }
+
     pub fn piece(&self) -> Option<HivePiece> {
-        match self {
-            &HiveMove::Place(p, _) => Some(p),
-            &HiveMove::Move(p, _, _) => Some(p),
-            &HiveMove::Pass => None,
+        match &self.0 {
+            &MoveInner::Place(p, _) => Some(p),
+            &MoveInner::Move(p, _, _) => Some(p),
+            &MoveInner::Pass => None,
         }
     }
 
     pub fn dest(&self) -> Option<HexCoord> {
-        match self {
-            &HiveMove::Place(_, c) => Some(c),
-            &HiveMove::Move(_, _, c) => Some(c),
-            &HiveMove::Pass => None,
+        match &self.0 {
+            &MoveInner::Place(_, c) => Some(c),
+            &MoveInner::Move(_, _, c) => Some(c),
+            &MoveInner::Pass => None,
         }
     }
 
     pub fn is_place(&self) -> bool {
-        match self {
-            &HiveMove::Place(_, _) => true,
-            &HiveMove::Move(_, _, _) => false,
-            &HiveMove::Pass => false,
+        match &self.0 {
+            &MoveInner::Place(_, _) => true,
+            &MoveInner::Move(_, _, _) => false,
+            &MoveInner::Pass => false,
         }
     }
 
     pub fn is_move(&self) -> bool {
-        match self {
-            &HiveMove::Place(_, _) => false,
-            &HiveMove::Move(_, _, _) => true,
-            &HiveMove::Pass => false,
+        match &self.0 {
+            &MoveInner::Place(_, _) => false,
+            &MoveInner::Move(_, _, _) => true,
+            &MoveInner::Pass => false,
         }
     }
 
     pub fn is_pass(&self) -> bool {
-        match self {
-            &HiveMove::Place(_, _) => false,
-            &HiveMove::Move(_, _, _) => false,
-            &HiveMove::Pass => true,
+        match &self.0 {
+            &MoveInner::Place(_, _) => false,
+            &MoveInner::Move(_, _, _) => false,
+            &MoveInner::Pass => true,
         }
     }
 }
@@ -722,10 +731,14 @@ impl HiveGame {
             //}
 
             //println!("It can move to {:?}", dests);
-            res.extend(dests.into_iter().map(|d| HiveMove::Move(p, c, d)));
+            res.extend(
+                dests
+                    .into_iter()
+                    .map(|d| HiveMove(MoveInner::Move(p, c, d))),
+            );
         }
 
-        res.push(HiveMove::Pass);
+        res.push(HiveMove(MoveInner::Pass));
 
         res
     }
@@ -780,7 +793,7 @@ impl HiveGame {
 
         for p in pieces {
             for &d in dests.iter() {
-                res.push(HiveMove::Place(p, d))
+                res.push(HiveMove(MoveInner::Place(p, d)));
             }
         }
 
@@ -801,9 +814,12 @@ impl HiveGame {
     }
 
     pub fn make_move(&self, mov: HiveMove) -> HiveResult {
-        if !self.valid_moves().into_iter().any(|m| m == mov) {
-            return HiveResult::Invalid;
-        }
+        // no longer checking if mov is valid
+        // as moves are only generated by a HiveGame
+        // TODO validate the game instance / turn number are correct I guess
+        //if !self.valid_moves().into_iter().any(|m| m == mov) {
+        //    return HiveResult::Invalid;
+        //}
 
         let mut res = self.clone();
 
@@ -819,8 +835,8 @@ impl HiveGame {
             &mut res.queen_loc_b
         };
 
-        match mov {
-            HiveMove::Place(p, c) => {
+        match mov.0 {
+            MoveInner::Place(p, c) => {
                 *hand.get_mut(&p.bug).unwrap() -= 1;
                 if hand.get(&p.bug) == Some(&0) {
                     hand.remove(&p.bug);
@@ -832,14 +848,14 @@ impl HiveGame {
 
                 res.board.place(c, p);
             }
-            HiveMove::Move(p, s, d) => {
+            MoveInner::Move(p, s, d) => {
                 if p.bug == HiveBug::Queen {
                     queen_loc.replace(d);
                 }
 
                 res.board.mov(s, d);
             }
-            HiveMove::Pass => {}
+            MoveInner::Pass => {}
         }
 
         res.turn = !res.turn;

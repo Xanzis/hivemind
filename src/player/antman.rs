@@ -16,7 +16,7 @@ impl Player for AntMan {
         self.visited_nodes = 0;
         self.ant_hits = 0;
 
-        let res = self.eval(HiveResult::Cont(game), 5, i32::MIN, i32::MAX, own_color);
+        let res = self.eval(HiveResult::Cont(game), 3, i32::MIN, i32::MAX, own_color);
 
         println!(
             "AntMan processed {} nodes, value {}, ant book hits {}",
@@ -41,31 +41,31 @@ impl AntMan {
         let game = match res {
             HiveResult::WinW(_) => {
                 return if color {
-                    (i32::MAX, HiveMove::Pass)
+                    (i32::MAX, HiveMove::pass())
                 } else {
-                    (i32::MIN, HiveMove::Pass)
+                    (i32::MIN, HiveMove::pass())
                 }
             }
             HiveResult::WinB(_) => {
                 return if !color {
-                    (i32::MAX, HiveMove::Pass)
+                    (i32::MAX, HiveMove::pass())
                 } else {
-                    (i32::MIN, HiveMove::Pass)
+                    (i32::MIN, HiveMove::pass())
                 }
             }
-            HiveResult::Draw(_) => return (0, HiveMove::Pass),
+            HiveResult::Draw(_) => return (0, HiveMove::pass()),
             HiveResult::Cont(g) => g,
             _ => panic!("eek"),
         };
 
         if depth == 0 {
-            return (search_val(&game, color), HiveMove::Pass);
+            return (search_val(&game, color), HiveMove::pass());
         }
 
         if game.turn() == color {
             // maximizing player
             let mut value = i32::MIN;
-            let mut mov = HiveMove::Pass;
+            let mut mov = HiveMove::pass();
 
             // sort by heuristic value for better pruning
             let mut moves = game.valid_moves();
@@ -113,7 +113,7 @@ impl AntMan {
         } else {
             // minimizing player
             let mut value = i32::MAX;
-            let mut mov = HiveMove::Pass;
+            let mut mov = HiveMove::pass();
 
             // sort by heuristic value for better pruning
             let mut moves = game.valid_moves();

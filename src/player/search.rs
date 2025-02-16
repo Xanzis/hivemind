@@ -38,31 +38,31 @@ fn eval_search(
     let game = match res {
         HiveResult::WinW(_) => {
             return if color {
-                (i32::MAX, HiveMove::Pass)
+                (i32::MAX, HiveMove::pass())
             } else {
-                (i32::MIN, HiveMove::Pass)
+                (i32::MIN, HiveMove::pass())
             }
         }
         HiveResult::WinB(_) => {
             return if !color {
-                (i32::MAX, HiveMove::Pass)
+                (i32::MAX, HiveMove::pass())
             } else {
-                (i32::MIN, HiveMove::Pass)
+                (i32::MIN, HiveMove::pass())
             }
         }
-        HiveResult::Draw(_) => return (0, HiveMove::Pass),
+        HiveResult::Draw(_) => return (0, HiveMove::pass()),
         HiveResult::Cont(g) => g,
         _ => panic!("eek"),
     };
 
     if depth == 0 {
-        return (search_val(&game, color), HiveMove::Pass);
+        return (search_val(&game, color), HiveMove::pass());
     }
 
     if game.turn() == color {
         // maximizing player
         let mut value = i32::MIN;
-        let mut mov = HiveMove::Pass;
+        let mut mov = HiveMove::pass();
 
         // sort by heuristic value for better pruning
         let mut moves = game.valid_moves();
@@ -88,7 +88,7 @@ fn eval_search(
     } else {
         // minimizing player
         let mut value = i32::MAX;
-        let mut mov = HiveMove::Pass;
+        let mut mov = HiveMove::pass();
 
         // sort by heuristic value for better pruning
         let mut moves = game.valid_moves();
