@@ -2,83 +2,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem::MaybeUninit;
-use std::ops::{Add, Mul, Sub};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HexCoord(i8, i8);
-
-impl Add for HexCoord {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        HexCoord(self.0 + other.0, self.1 + other.1)
-    }
-}
-
-impl Sub for HexCoord {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        HexCoord(self.0 - other.0, self.1 - other.1)
-    }
-}
-
-impl Mul<i8> for HexCoord {
-    type Output = Self;
-
-    fn mul(self, other: i8) -> Self {
-        HexCoord(self.0 * other, self.1 * other)
-    }
-}
-
-const HEXDIR: [HexCoord; 6] = [
-    HexCoord(1, -1),
-    HexCoord(1, 0),
-    HexCoord(0, 1),
-    HexCoord(-1, 1),
-    HexCoord(-1, 0),
-    HexCoord(0, -1),
-];
-
-impl HexCoord {
-    fn origin() -> Self {
-        HexCoord(0, 0)
-    }
-
-    fn neighbors<'a>(&'a self) -> impl Iterator<Item = Self> + 'a {
-        HEXDIR.iter().map(|&x| x + *self)
-    }
-
-    fn to_offset(&self) -> (i8, i8) {
-        // convert to row/column offset coordinates
-
-        let col = self.0 + (self.1 - (self.1 & 1)) / 2;
-        let row = self.1;
-        (row, col)
-    }
-
-    pub fn dist(&self, other: &Self) -> i8 {
-        let v = *self - *other;
-        ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2
-    }
-
-    pub fn shared_neighbors(&self, other: &Self) -> Option<(Self, Self)> {
-        // return the two shared neighbors of two coords, if any
-        let dir = match *other - *self {
-            HexCoord(1, 0) => (HexCoord(1, -1), HexCoord(0, 1)),
-            HexCoord(0, 1) => (HexCoord(1, 0), HexCoord(-1, 1)),
-            HexCoord(-1, 1) => (HexCoord(0, 1), HexCoord(-1, 0)),
-            HexCoord(-1, 0) => (HexCoord(-1, 1), HexCoord(0, -1)),
-            HexCoord(0, -1) => (HexCoord(-1, 0), HexCoord(1, -1)),
-            HexCoord(1, -1) => (HexCoord(0, -1), HexCoord(1, 0)),
-            _ => return None,
-        };
-
-        Some((*self + dir.0, *self + dir.1))
-    }
-}
+mod hex;
+pub use hex::{HexCoord, HEXDIR, SpiralBufMap, SpiralBufSet};
 
 #[derive(Clone, Copy)]
 struct Pile<T: Copy> {
@@ -149,10 +77,17 @@ impl<T: fmt::Debug + Copy> fmt::Debug for Pile<T> {
     }
 }
 
+impl<T: Copy> Default for Pile<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // the vec is kept empty for references to empty cells
 #[derive(Debug, Clone)]
 pub struct HexBoard<T: Copy> {
-    map: FxHashMap<HexCoord, Pile<T>>,
+    //map: FxHashMap<HexCoord, Pile<T>>,
+    map: SpiralBufMap<Pile<T>>,
     empty: Pile<T>,
 
     perimeter: FxHashSet<HexCoord>,
@@ -162,7 +97,7 @@ pub struct HexBoard<T: Copy> {
 impl<T: Copy + fmt::Debug> HexBoard<T> {
     fn new() -> Self {
         HexBoard {
-            map: FxHashMap::default(),
+            map: Default::default(),
             empty: Pile::new(),
             perimeter: FxHashSet::default(),
             occupied: FxHashSet::default(),
@@ -273,7 +208,9 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
     fn reachable_without(&self, from: HexCoord, mut to: Vec<HexCoord>, without: HexCoord) -> bool {
         // starting at from, and not traversing without, can you reach all the coords in to?
         let mut to_check = vec![from];
-        let mut visited = HashSet::new();
+        //let mut visited = HashSet::new();
+        //let mut visited = FxHashSet::default();
+        let mut visited = SpiralBufSet::default();
 
         while let Some(cur) = to_check.pop() {
             for nb in self.neighbor_cells(cur) {
@@ -352,7 +289,6 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             return false;
         }
 
-        // it's not a bridge if it has only 1 neighbor
         let mut nbs: Vec<_> = self.neighbor_cells(coord).collect();
 
         if nbs.len() == 0 {
@@ -363,6 +299,7 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             }
         }
 
+        // it's not a bridge if it has only 1 neighbor
         if nbs.len() == 1 {
             return false;
         }
