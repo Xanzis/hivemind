@@ -6,7 +6,7 @@ use std::mem::MaybeUninit;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 mod hex;
-pub use hex::{HexCoord, HEXDIR, SpiralBufMap, SpiralBufSet};
+pub use hex::{HexCoord, SpiralBufMap, SpiralBufSet, HEXDIR};
 
 #[derive(Clone, Copy)]
 struct Pile<T: Copy> {

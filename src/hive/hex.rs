@@ -99,7 +99,7 @@ impl<T> SpiralBufMap<T> {
         } else if r == n {
             n + 1 - q
         } else {
-            let sign = if q >= 0 {1} else {0};
+            let sign = if q >= 0 { 1 } else { 0 };
             (2 * r) + (4 * n) + sign
         };
 
@@ -118,7 +118,7 @@ impl<T> SpiralBufMap<T> {
 
         Some(val)
     }
-    
+
     pub fn contains(&self, c: &HexCoord) -> bool {
         self.get(c).is_some()
     }
@@ -138,7 +138,8 @@ impl<T> SpiralBufMap<T> {
         let idx = Self::idx(c);
 
         if idx >= self.buf.len() {
-            self.buf.resize_with((idx + 1).next_power_of_two(), Default::default);
+            self.buf
+                .resize_with((idx + 1).next_power_of_two(), Default::default);
         }
 
         let old = std::mem::replace(&mut self.buf[idx], None);
@@ -156,7 +157,7 @@ impl<T> SpiralBufMap<T> {
         let idx = Self::idx(*c);
 
         if idx >= self.buf.len() {
-            return None
+            return None;
         }
 
         let val = std::mem::replace(&mut self.buf[idx], None);
@@ -220,7 +221,7 @@ impl SpiralBufSet {
 
     pub fn insert(&mut self, c: HexCoord) -> bool {
         if self.contains(&c) {
-            return false
+            return false;
         }
 
         self.0.insert(c, ());
