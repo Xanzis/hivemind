@@ -55,7 +55,7 @@ fn eval_search(
         _ => panic!("eek"),
     };
 
-    if depth >= 5 {
+    if depth >= 3 {
         return (search_val(&game, color), HiveMove::pass());
     }
 
