@@ -55,7 +55,7 @@ fn eval_search(
         _ => panic!("eek"),
     };
 
-    if depth >= 3 {
+    if depth >= 5 {
         return (search_val(&game, color), HiveMove::pass());
     }
 
@@ -219,17 +219,18 @@ fn search_val(game: &HiveGame, color: bool) -> i32 {
     }
 
     // own pieces not being bridges is good (freer to move)
-    for (&c, &p) in board.all_top() {
-        if p.color() == color {
-            if !board.is_bridge(c) {
-                res += 2;
+    // removing for now, bridge finding is super expensive
+    // for (&c, &p) in board.all_top() {
+    //     if p.color() == color {
+    //         if !board.is_bridge(c) {
+    //             res += 2;
 
-                if p.bug() == HiveBug::Ant {
-                    res += 2;
-                }
-            }
-        }
-    }
+    //             if p.bug() == HiveBug::Ant {
+    //                 res += 2;
+    //             }
+    //         }
+    //     }
+    // }
 
     res
 }
