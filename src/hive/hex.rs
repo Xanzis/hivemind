@@ -1,6 +1,7 @@
+use std::fmt;
 use std::ops::{Add, Mul, Sub};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HexCoord(i8, i8);
 
 impl Add for HexCoord {
@@ -27,6 +28,12 @@ impl Mul<i8> for HexCoord {
     }
 }
 
+impl fmt::Display for HexCoord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Hex({}, {})", self.0, self.1)
+    }
+}
+
 pub const HEXDIR: [HexCoord; 6] = [
     HexCoord(1, -1),
     HexCoord(1, 0),
@@ -41,8 +48,9 @@ impl HexCoord {
         HexCoord(0, 0)
     }
 
-    pub fn neighbors<'a>(&'a self) -> impl Iterator<Item = Self> + 'a {
-        HEXDIR.iter().map(|&x| x + *self)
+    pub fn neighbors(&self) -> impl Iterator<Item = Self> {
+        let origin = *self;
+        HEXDIR.iter().map(move |&x| x + origin)
     }
 
     pub fn to_offset(&self) -> (i8, i8) {
@@ -87,11 +95,22 @@ impl<T> SpiralBufMap<T> {
         let HexCoord(q, r) = c;
         let (q, r, n) = (q as i16, r as i16, n as i16); // so later ops don't overflow
 
-        let ring_start = if n == 0 {
-            0
-        } else {
-            //(3 * n * n) - (3 * n) + 1
-            (3 * n * (n - 1)) + 1
+        // let ring_start = if n == 0 {
+        //     0
+        // } else {
+        //     //(3 * n * n) - (3 * n) + 1
+        //     (3 * n * (n - 1)) + 1
+        // };
+
+        let ring_start = match n {
+            0 => 0,
+            1 => 1,
+            2 => 7,
+            3 => 19,
+            4 => 37,
+            5 => 61,
+            6 => 91,
+            x => (3 * x * (x - 1)) + 1,
         };
 
         let ring_idx = if r == 0 - n {
@@ -194,6 +213,18 @@ impl<T> IntoIterator for SpiralBufMap<T> {
     }
 }
 
+impl<T: fmt::Display> fmt::Display for SpiralBufMap<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[")?;
+
+        for x in self.iter() {
+            write!(f, "({}: {}), ", x.0, x.1)?;
+        }
+
+        write!(f, "]")
+    }
+}
+
 pub struct BufMapEntry<'a, V> {
     occupied: bool,
     key: HexCoord,
@@ -230,5 +261,25 @@ impl SpiralBufSet {
 
     pub fn contains(&self, c: &HexCoord) -> bool {
         self.0.contains(c)
+    }
+
+    pub fn remove(&mut self, c: &HexCoord) -> bool {
+        self.0.remove(c).is_some()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &HexCoord> {
+        self.0.iter().map(|(a, b)| a)
+    }
+}
+
+impl fmt::Display for SpiralBufSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[")?;
+
+        for x in self.iter() {
+            write!(f, "{}, ", x)?;
+        }
+
+        write!(f, "]")
     }
 }

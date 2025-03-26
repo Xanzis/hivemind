@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -91,7 +92,8 @@ pub struct HexBoard<T: Copy> {
     empty: Pile<T>,
 
     perimeter: FxHashSet<HexCoord>,
-    occupied: FxHashSet<HexCoord>,
+    occupied: SpiralBufSet,
+    bridges: RefCell<Option<SpiralBufSet>>,
 }
 
 impl<T: Copy + fmt::Debug> HexBoard<T> {
@@ -100,7 +102,8 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             map: Default::default(),
             empty: Pile::new(),
             perimeter: FxHashSet::default(),
-            occupied: FxHashSet::default(),
+            occupied: SpiralBufSet::default(),
+            bridges: RefCell::new(None),
         }
     }
 
@@ -131,6 +134,9 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         self.perimeter.extend(nb);
         self.perimeter.remove(&coord);
         self.occupied.insert(coord);
+
+        //invalidate bridge cache
+        self.bridges.take();
     }
 
     fn mov(&mut self, from: HexCoord, to: HexCoord) -> bool {
@@ -156,6 +162,9 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             self.perimeter.remove(&to);
             self.occupied.insert(to);
 
+            //invalidate bridge cache
+            self.bridges.take();
+
             true
         } else {
             false
@@ -170,7 +179,7 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
         &self.perimeter
     }
 
-    pub fn occupied(&self) -> &FxHashSet<HexCoord> {
+    pub fn occupied(&self) -> &SpiralBufSet {
         &self.occupied
     }
 
@@ -184,25 +193,22 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
 
     pub fn disp_occupied(&self) -> String {
         let mut res: HexBoard<char> = HexBoard::new();
-        for &c in self.occupied() {
+        for &c in self.occupied().iter() {
             res.place(c, 'O');
         }
         res.disp()
     }
 
     pub fn neighbor_space<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = HexCoord> + 'a {
-        let nb: Vec<_> = coord.neighbors().collect();
-        nb.into_iter().filter(|&x| self.is_empty(x))
+        coord.neighbors().filter(|&x| self.is_empty(x))
     }
 
     pub fn neighbor_cells<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = HexCoord> + 'a {
-        let nb: Vec<_> = coord.neighbors().collect();
-        nb.into_iter().filter(|&x| self.get_top(x).is_some())
+        coord.neighbors().filter(|&x| self.get_top(x).is_some())
     }
 
     pub fn neighbor_pieces<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = &'a T> {
-        let nb: Vec<_> = coord.neighbors().collect();
-        nb.into_iter().filter_map(|x| self.get_top(x))
+        coord.neighbors().filter_map(|x| self.get_top(x))
     }
 
     fn reachable_without(&self, from: HexCoord, mut to: Vec<HexCoord>, without: HexCoord) -> bool {
@@ -280,7 +286,10 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
             .collect()
     }
 
-    pub fn is_bridge(&self, coord: HexCoord) -> bool {
+    pub fn is_bridge_old(&self, coord: HexCoord) -> bool {
+        // redundant, replaced by find_bridges
+        // keep around as a check that the graph based solution is working correctly
+
         // if the piece is not a bridge between disjoint hives the number of cells reachable
         // from one of its neighbors (minus the piece in question) should be occupied-1
 
@@ -306,7 +315,140 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
 
         let nb = nbs.pop().unwrap();
         let other_nbs = nbs;
-        !self.reachable_without(nb, other_nbs, coord)
+        let res = !self.reachable_without(nb, other_nbs, coord);
+
+        let search_res = self.find_bridges().contains(&coord);
+
+        assert_eq!(res, search_res);
+
+        res
+    }
+
+    pub fn is_bridge(&self, coord: HexCoord) -> bool {
+        // need to compute bridges lazily, using an interior mutability cache
+        // cell seems fine as a spiral map is 3 usizes (including the vec pointer)
+        let bridges = self.bridges.take().unwrap_or_else(|| self.find_bridges());
+
+        let res = bridges.contains(&coord);
+        self.bridges.replace(Some(bridges));
+        res
+    }
+
+    fn find_bridges(&self) -> SpiralBufSet {
+        let mut bridges: SpiralBufSet = Default::default();
+        let mut dfs_idx: SpiralBufMap<usize> = Default::default();
+        let mut dfs_low: SpiralBufMap<usize> = Default::default(); // lowest idx in tree reachable from descendant nodes
+        let mut parent: SpiralBufMap<HexCoord> = Default::default();
+        let mut visited: SpiralBufSet = Default::default();
+
+        let mut count: usize = 0;
+
+        let root = *self.occupied().iter().next().unwrap();
+
+        self.bridge_search(
+            root,
+            &mut count,
+            &mut bridges,
+            &mut dfs_idx,
+            &mut dfs_low,
+            &mut parent,
+            &mut visited,
+        );
+
+        // let mut idx_board: HexBoard<DbgUsize> = HexBoard::new();
+        // dfs_idx.iter().for_each(|(&c, &idx)| idx_board.place(c, DbgUsize(idx)));
+
+        // let mut low_board: HexBoard<DbgUsize> = HexBoard::new();
+        // dfs_low.iter().for_each(|(&c, &low)| low_board.place(c, DbgUsize(low)));
+
+        // let mut bridge_board: HexBoard<char> = HexBoard::new();
+        // for (c, _) in self.all_top() {
+        //     if bridges.contains(c) {
+        //         bridge_board.place(*c, 'Y');
+        //     } else {
+        //         bridge_board.place(*c, 'N');
+        //     }
+        // }
+
+        // println!("Completed bridge search");
+        // println!("dfs idx:\n{}", idx_board.disp());
+        // println!("lowest node accessible from subtree:\n{}", low_board.disp());
+
+        // println!("bridges:\n{}", bridge_board.disp());
+
+        bridges
+    }
+
+    fn bridge_search(
+        &self,
+        node: HexCoord,
+        count: &mut usize,
+        bridges: &mut SpiralBufSet,
+        dfs_idx: &mut SpiralBufMap<usize>,
+        dfs_low: &mut SpiralBufMap<usize>,
+        parent: &mut SpiralBufMap<HexCoord>,
+        visited: &mut SpiralBufSet,
+    ) {
+        visited.insert(node);
+
+        dfs_idx.insert(node, *count);
+        dfs_low.insert(node, *count);
+        *count += 1;
+
+        let mut children = 0;
+
+        let node_parent = parent.get(&node).cloned();
+
+        for adj in self.neighbor_cells(node) {
+            if !visited.contains(&adj) {
+                children += 1;
+                parent.insert(adj, node);
+                self.bridge_search(adj, count, bridges, dfs_idx, dfs_low, parent, visited);
+
+                // update earliest ancestor reachable from node subtree to earliest ancestor reachable from child subtree if earlier
+                dfs_low.insert(
+                    node,
+                    *dfs_low.get(&node).unwrap().min(dfs_low.get(&adj).unwrap()),
+                );
+
+                // if ANY child has a subtree with earliest reachable ancestor >= node, node is a bridge
+                if dfs_low.get(&adj).unwrap() >= dfs_idx.get(&node).unwrap()
+                    && node_parent.is_some()
+                {
+                    bridges.insert(node);
+                }
+            } else if Some(adj) != node_parent {
+                // already visited, so this is a backedge, update earliest ancestor reachable from subtree to adj index if earlier
+                dfs_low.insert(
+                    node,
+                    *dfs_low.get(&node).unwrap().min(dfs_idx.get(&adj).unwrap()),
+                );
+            }
+        }
+
+        // if node_parent.is_some() && dfs_low.get(&node) == dfs_idx.get(&node) && children != 0 {
+        //     bridges.insert(node);
+        // }
+
+        if node_parent.is_none() && children > 1 {
+            // node is root and multiple children
+            bridges.insert(node);
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DbgUsize(usize);
+
+impl From<usize> for DbgUsize {
+    fn from(x: usize) -> Self {
+        DbgUsize(x)
+    }
+}
+
+impl From<DbgUsize> for char {
+    fn from(x: DbgUsize) -> char {
+        char::from_digit((x.0 % 10) as u32, 10).unwrap()
     }
 }
 
