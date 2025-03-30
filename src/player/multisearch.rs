@@ -51,6 +51,7 @@ fn eval_search(
             }
         }
         HiveResult::Draw(_) => return (0, HiveMove::pass()),
+        HiveResult::OutOfMoves(g) => return (search_val(&g, color), HiveMove::pass()), // out of moves, return heuristic value
         HiveResult::Cont(g) => g,
         _ => panic!("eek"),
     };

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct AntMan {
-    ant_book: HashMap<HiveResult, i32>,
+    ant_book: HashMap<HiveResult<'static>, i32>,
     visited_nodes: usize,
     ant_hits: usize,
 }
@@ -30,7 +30,7 @@ impl Player for AntMan {
 impl AntMan {
     fn eval(
         &mut self,
-        res: HiveResult,
+        res: HiveResult<'_>,
         depth: usize,
         mut alpha: i32,
         mut beta: i32,
@@ -88,7 +88,7 @@ impl AntMan {
                                 .eval(node.clone(), depth - 1, alpha, beta, color)
                                 .0
                                 .saturating_sub(1);
-                            self.ant_book.insert(node, v);
+                            self.ant_book.insert(node.strip_budget(), v);
                             v
                         }
                     } else {
@@ -133,7 +133,7 @@ impl AntMan {
                                 .eval(node.clone(), depth - 1, alpha, beta, color)
                                 .0
                                 .saturating_sub(1);
-                            self.ant_book.insert(node, v);
+                            self.ant_book.insert(node.strip_budget(), v);
                             v
                         }
                     } else {
