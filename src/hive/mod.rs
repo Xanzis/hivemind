@@ -706,17 +706,10 @@ impl<'a> HiveResult<'a> {
         }
     }
 
-    pub fn strip_budget(self) -> HiveResult<'static> {
-        use HiveResult::*;
-
-        match self {
-            Cont(g) => Cont(g.strip_budget()),
-            WinW(g) => WinW(g.strip_budget()),
-            WinB(g) => WinB(g.strip_budget()),
-            Draw(g) => Draw(g.strip_budget()),
-            OutOfMoves(g) => OutOfMoves(g.strip_budget()),
-            Invalid => Invalid,
-        }
+    pub fn default_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -768,13 +761,6 @@ impl<'c> HiveGame<'c> {
         }
     }
 
-    pub fn strip_budget(self) -> HiveGame<'static> {
-        HiveGame {
-            move_budget: None,
-            ..self
-        }
-    }
-
     pub fn round(&self) -> usize {
         self.round
     }
@@ -793,6 +779,12 @@ impl<'c> HiveGame<'c> {
 
     pub fn board<'a>(&'a self) -> &'a HexBoard<HivePiece> {
         &self.board
+    }
+
+    pub fn default_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 
     fn queen_surrounded(&self, color: bool) -> bool {
@@ -1007,13 +999,8 @@ impl Hash for HiveGame<'_> {
 
 impl PartialEq for HiveGame<'_> {
     fn eq(&self, other: &Self) -> bool {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        let self_hash = hasher.finish();
-
-        let mut hasher = DefaultHasher::new();
-        other.hash(&mut hasher);
-        let other_hash = hasher.finish();
+        let self_hash = self.default_hash();
+        let other_hash = other.default_hash();
 
         self_hash == other_hash
     }

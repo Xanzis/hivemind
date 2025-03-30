@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct AntMan {
-    ant_book: HashMap<HiveResult<'static>, i32>,
+    ant_book: HashMap<u64, i32>, // book of hashed hive results against node values
     visited_nodes: usize,
     ant_hits: usize,
 }
@@ -80,7 +80,7 @@ impl AntMan {
                     let is_ant_move = m.piece().map(|p| p.bug() == HiveBug::Ant).unwrap_or(false);
 
                     if is_ant_move {
-                        if let Some(&v) = self.ant_book.get(&node) {
+                        if let Some(&v) = self.ant_book.get(&node.default_hash()) {
                             self.ant_hits += 1;
                             v
                         } else {
@@ -88,7 +88,7 @@ impl AntMan {
                                 .eval(node.clone(), depth - 1, alpha, beta, color)
                                 .0
                                 .saturating_sub(1);
-                            self.ant_book.insert(node.strip_budget(), v);
+                            self.ant_book.insert(node.default_hash(), v);
                             v
                         }
                     } else {
@@ -126,14 +126,14 @@ impl AntMan {
                     let is_ant_move = m.piece().map(|p| p.bug() == HiveBug::Ant).unwrap_or(false);
 
                     if is_ant_move {
-                        if let Some(&v) = self.ant_book.get(&node) {
+                        if let Some(&v) = self.ant_book.get(&node.default_hash()) {
                             v
                         } else {
                             let v = self
                                 .eval(node.clone(), depth - 1, alpha, beta, color)
                                 .0
                                 .saturating_sub(1);
-                            self.ant_book.insert(node.strip_budget(), v);
+                            self.ant_book.insert(node.default_hash(), v);
                             v
                         }
                     } else {
