@@ -10,7 +10,7 @@ fn main() {
     let mut player1 = player::search::Search::default();
     let mut player2 = player::multisearch::MultiSearch::default();
 
-    let node_limit: u32 = 10_000;
+    let node_limit: u32 = 40_000;
 
     let mut game = HiveGame::new();
     println!("\nGame state:\n{}", game.disp());

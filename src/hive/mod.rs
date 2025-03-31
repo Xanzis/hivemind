@@ -96,7 +96,7 @@ pub struct HexBoard<T: Copy> {
     bridges: RefCell<Option<SpiralBufSet>>,
 }
 
-impl<T: Copy + fmt::Debug> HexBoard<T> {
+impl<T: Copy> HexBoard<T> {
     fn new() -> Self {
         HexBoard {
             map: Default::default(),
@@ -124,7 +124,6 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
 
     fn place(&mut self, coord: HexCoord, piece: T) {
         if !self.is_empty(coord) {
-            println!("bad board state:\n{:?}", self);
             panic!("aaa");
         }
 
@@ -437,6 +436,29 @@ impl<T: Copy + fmt::Debug> HexBoard<T> {
     }
 }
 
+impl<T: Copy + Hash> HexBoard<T> {
+    pub fn default_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+impl<T: Copy + Hash> Hash for HexBoard<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // no longer have to sort the cells as SpiralBufMap has a deterministic order
+        for (coord, content) in self.map.iter() {
+            // self.map may contain cells that were inserted but that pieces have since been removed from
+            if content.is_empty() {
+                continue;
+            }
+
+            coord.hash(state);
+            content.hash(state);
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct DbgUsize(usize);
 
@@ -723,6 +745,8 @@ pub struct HiveGame<'a> {
     turn: bool,
     round: usize,
 
+    seen_boards: HashMap<u64, u32>,
+
     move_budget: Option<&'a Cell<u32>>,
 }
 
@@ -749,6 +773,8 @@ impl<'c> HiveGame<'c> {
             queen_loc_b: None,
             turn: true,
             round: 0,
+
+            seen_boards: HashMap::new(),
 
             move_budget: None,
         }
@@ -976,6 +1002,14 @@ impl<'c> HiveGame<'c> {
         if res.turn {
             res.round += 1;
         }
+
+        let seen_count = res.seen_boards.entry(res.board.default_hash()).or_insert(0);
+        if *seen_count > 2 {
+            // board repeated too many times
+            // call it a draw, not strictly part of hive rules but seems reasonable
+            return HiveResult::Draw(res);
+        }
+        *seen_count += 1;
 
         match (res.queen_surrounded(false), res.queen_surrounded(true)) {
             (true, false) => HiveResult::WinW(res),
