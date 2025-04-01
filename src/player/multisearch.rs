@@ -10,17 +10,30 @@ impl Player for MultiSearch {
 
         let mut nodes: u32 = 0;
 
-        let res = eval_search(
-            HiveResult::Cont(game),
-            0,
-            i32::MIN,
-            i32::MAX,
-            own_color,
-            &mut nodes,
-        );
+        let mut depth = 1;
 
-        println!("MultiSearch processed {} nodes, value {}", nodes, res.0);
+        let res = loop {
+            let cur_res = eval_search(
+                HiveResult::Cont(game.clone()),
+                depth,
+                i32::MIN,
+                i32::MAX,
+                own_color,
+                &mut nodes,
+            );
 
+            //println!("depth {} move {:?}", depth, cur_res);
+
+            if game.move_budget() == 0 {
+                // out of budget to expand nodes
+                // return the best move at the latest depth
+                break cur_res;
+            }
+
+            depth += 1;
+        };
+
+        //println!("MultiSearch processed {} nodes, value {}", nodes, res.0);
         res.1
     }
 }
@@ -56,24 +69,30 @@ fn eval_search(
         _ => panic!("eek"),
     };
 
-    if depth >= 5 {
+    if depth == 0 {
         return (search_val(&game, color), HiveMove::pass());
     }
 
-    if game.turn() == color {
-        // maximizing player
-        let mut value = i32::MIN;
-        let mut mov = HiveMove::pass();
+    let mut value = if game.turn() == color {
+        i32::MIN
+    } else {
+        i32::MAX
+    };
+    let mut mov = HiveMove::pass();
 
-        // sort by heuristic value for better pruning
-        let mut moves = moves_to_search(&game, depth, color);
-        moves.sort_by_cached_key(|&m| -1 * search_val(&game.make_move(m).game().unwrap(), color));
+    let mut moves = moves_to_search(&game, depth, color);
+    let mut results: Vec<(HiveMove, HiveResult)> =
+        moves.into_iter().map(|m| (m, game.make_move(m))).collect();
 
-        for m in moves {
-            let node_val = eval_search(game.make_move(m), depth + 1, alpha, beta, color, nodes)
-                .0
-                .saturating_sub(1);
+    results.sort_by_cached_key(|(m, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
 
+    for (m, r) in results {
+        let node_val = eval_search(r, depth - 1, alpha, beta, color, nodes)
+            .0
+            .saturating_sub(1);
+
+        if game.turn() == color {
+            // maximizing player
             if node_val > value {
                 value = node_val;
                 mov = m;
@@ -84,22 +103,7 @@ fn eval_search(
             }
 
             alpha = alpha.max(value);
-        }
-        return (value, mov);
-    } else {
-        // minimizing player
-        let mut value = i32::MAX;
-        let mut mov = HiveMove::pass();
-
-        // sort by heuristic value for better pruning
-        let mut moves = moves_to_search(&game, depth, color);
-        moves.sort_by_cached_key(|&m| search_val(&game.make_move(m).game().unwrap(), color));
-
-        for m in moves {
-            let node_val = eval_search(game.make_move(m), depth + 1, alpha, beta, color, nodes)
-                .0
-                .saturating_sub(1);
-
+        } else {
             if node_val < value {
                 value = node_val;
                 mov = m;
@@ -111,15 +115,16 @@ fn eval_search(
 
             beta = beta.min(value);
         }
-        return (value, mov);
     }
+
+    (value, mov)
 }
 
 fn moves_to_search(game: &HiveGame, depth: usize, color: bool) -> Vec<HiveMove> {
     let valid_moves = game.valid_moves();
 
     // fully search up to a near depth
-    if depth <= 2 {
+    if depth > 3 {
         return valid_moves;
     }
 
@@ -153,7 +158,7 @@ fn moves_to_search(game: &HiveGame, depth: usize, color: bool) -> Vec<HiveMove> 
         }
 
         // stop adding lower-value moves farther down the tree
-        if depth > 3 {
+        if depth < 2 {
             continue;
         }
 

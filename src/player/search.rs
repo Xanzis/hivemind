@@ -1,117 +1,25 @@
-use super::Player;
+use super::{Heuristic, Player, SearchPlayer};
 use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
 
+pub type SearchNew = SearchPlayer<SearchHeuristic>;
+
 #[derive(Default)]
-pub struct Search();
+pub struct SearchHeuristic();
 
-impl Player for Search {
-    fn make_move(&mut self, game: HiveGame) -> HiveMove {
-        let own_color = game.turn();
-
-        let mut nodes: u32 = 0;
-
-        let res = eval_search(
-            HiveResult::Cont(game),
-            5,
-            i32::MIN,
-            i32::MAX,
-            own_color,
-            &mut nodes,
-        );
-
-        println!("Search processed {} nodes, value {}", nodes, res.0);
-
-        res.1
-    }
-}
-
-fn eval_search(
-    res: HiveResult,
-    depth: usize,
-    mut alpha: i32,
-    mut beta: i32,
-    color: bool,
-    nodes: &mut u32,
-) -> (i32, HiveMove) {
-    *nodes += 1;
-
-    let game = match res {
-        HiveResult::WinW(_) => {
-            return if color {
-                (i32::MAX, HiveMove::pass())
-            } else {
-                (i32::MIN, HiveMove::pass())
-            }
-        }
-        HiveResult::WinB(_) => {
-            return if !color {
-                (i32::MAX, HiveMove::pass())
-            } else {
-                (i32::MIN, HiveMove::pass())
-            }
-        }
-        HiveResult::Draw(_) => return (0, HiveMove::pass()),
-        HiveResult::OutOfMoves(g) => return (search_val(&g, color), HiveMove::pass()), // out of moves, return heuristic value
-        HiveResult::Cont(g) => g,
-        _ => panic!("eek"),
-    };
-
-    if depth == 0 {
-        return (search_val(&game, color), HiveMove::pass());
+impl Heuristic for SearchHeuristic {
+    fn leaf_val(&mut self, game: &HiveGame, color: bool) -> i32 {
+        search_val(game, color)
     }
 
-    if game.turn() == color {
-        // maximizing player
-        let mut value = i32::MIN;
-        let mut mov = HiveMove::pass();
+    fn moves_to_search<'a>(
+        &mut self,
+        game: &HiveGame,
+        mut moves: Vec<(HiveMove, HiveResult<'a>)>,
+        _color: bool,
+    ) -> Vec<(HiveMove, HiveResult<'a>)> {
+        moves.sort_by_cached_key(|(_, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
 
-        // sort by heuristic value for better pruning
-        let mut moves = game.valid_moves();
-        moves.sort_by_cached_key(|&m| -1 * search_val(&game.make_move(m).game().unwrap(), color));
-
-        for m in moves {
-            let node_val = eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes)
-                .0
-                .saturating_sub(1);
-
-            if node_val > value {
-                value = node_val;
-                mov = m;
-            }
-
-            if value > beta {
-                break;
-            }
-
-            alpha = alpha.max(value);
-        }
-        return (value, mov);
-    } else {
-        // minimizing player
-        let mut value = i32::MAX;
-        let mut mov = HiveMove::pass();
-
-        // sort by heuristic value for better pruning
-        let mut moves = game.valid_moves();
-        moves.sort_by_cached_key(|&m| search_val(&game.make_move(m).game().unwrap(), color));
-
-        for m in moves {
-            let node_val = eval_search(game.make_move(m), depth - 1, alpha, beta, color, nodes)
-                .0
-                .saturating_sub(1);
-
-            if node_val < value {
-                value = node_val;
-                mov = m;
-            }
-
-            if value < alpha {
-                break;
-            }
-
-            beta = beta.min(value);
-        }
-        return (value, mov);
+        moves
     }
 }
 
@@ -160,17 +68,17 @@ fn search_val(game: &HiveGame, color: bool) -> i32 {
 
     // own pieces not being bridges is good (freer to move)
     // removing for now, bridge finding is super expensive
-    // for (&c, &p) in board.all_top() {
-    //     if p.color() == color {
-    //         if !board.is_bridge(c) {
-    //             res += 2;
+    for (&c, &p) in board.all_top() {
+        if p.color() == color {
+            if !board.is_bridge(c) {
+                res += 2;
 
-    //             if p.bug() == HiveBug::Ant {
-    //                 res += 2;
-    //             }
-    //         }
-    //     }
-    // }
+                if p.bug() == HiveBug::Ant {
+                    res += 2;
+                }
+            }
+        }
+    }
 
     res
 }

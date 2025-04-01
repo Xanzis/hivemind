@@ -7,7 +7,7 @@ use player::Player;
 use std::cell::Cell;
 
 fn main() {
-    let mut player1 = player::search::Search::default();
+    let mut player1 = player::search::SearchNew::default();
     let mut player2 = player::multisearch::MultiSearch::default();
 
     let node_limit: u32 = 40_000;

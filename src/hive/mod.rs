@@ -728,6 +728,17 @@ impl<'a> HiveResult<'a> {
         }
     }
 
+    pub fn game_ref<'b>(&'b self) -> Option<&'b HiveGame<'a>> {
+        match self {
+            HiveResult::Cont(g) => Some(&g),
+            HiveResult::WinW(g) => Some(&g),
+            HiveResult::WinB(g) => Some(&g),
+            HiveResult::Draw(g) => Some(&g),
+            HiveResult::OutOfMoves(g) => Some(&g),
+            _ => None,
+        }
+    }
+
     pub fn default_hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
@@ -1017,6 +1028,10 @@ impl<'c> HiveGame<'c> {
             (true, true) => HiveResult::Draw(res),
             (false, false) => HiveResult::Cont(res),
         }
+    }
+
+    pub fn move_budget(&self) -> u32 {
+        self.move_budget.map(|b| b.get()).unwrap_or(0)
     }
 }
 
