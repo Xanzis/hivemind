@@ -36,6 +36,10 @@ impl Player for MultiSearch {
         //println!("MultiSearch processed {} nodes, value {}", nodes, res.0);
         res.1
     }
+
+    fn ident(&self) -> &'static str {
+        "multisearch"
+    }
 }
 
 fn eval_search(

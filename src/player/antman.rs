@@ -25,6 +25,10 @@ impl Player for AntMan {
 
         res.1
     }
+
+    fn ident(&self) -> &'static str {
+        "antman"
+    }
 }
 
 impl AntMan {

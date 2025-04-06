@@ -21,4 +21,8 @@ impl Player for MinMove {
             })
             .unwrap()
     }
+
+    fn ident(&self) -> &'static str {
+        "min_move"
+    }
 }

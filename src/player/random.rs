@@ -10,4 +10,8 @@ impl Player for Random {
         let i = (9087901 + game.round()) % moves.len();
         moves[i]
     }
+
+    fn ident(&self) -> &'static str {
+        "random"
+    }
 }

@@ -55,4 +55,8 @@ impl Player for Swarm {
 
         mov
     }
+
+    fn ident(&self) -> &'static str {
+        "swarm"
+    }
 }

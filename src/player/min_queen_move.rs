@@ -24,4 +24,8 @@ impl Player for MinQueenMove {
             })
             .unwrap()
     }
+
+    fn ident(&self) -> &'static str {
+        "min_queen_move"
+    }
 }

@@ -21,6 +21,10 @@ impl Heuristic for SearchHeuristic {
 
         moves
     }
+
+    fn ident() -> &'static str {
+        "search"
+    }
 }
 
 fn search_val(game: &HiveGame, color: bool) -> i32 {

@@ -10,6 +10,8 @@ pub mod swarm;
 
 pub trait Player {
     fn make_move(&mut self, game: HiveGame) -> HiveMove;
+
+    fn ident(&self) -> &'static str;
 }
 
 pub trait Heuristic {
@@ -39,6 +41,8 @@ pub trait Heuristic {
     fn track_val(&mut self, game: &HiveGame, mov: &HiveMove, val: i32) {
         return;
     }
+
+    fn ident() -> &'static str;
 }
 
 // dfs player with generic heuristic, iterative deepening, and alpha-beta pruning
@@ -167,5 +171,9 @@ impl<T: Heuristic + Default> Player for SearchPlayer<T> {
 
         //println!("Search processed {} nodes, value {}", nodes, res.0);
         res.1
+    }
+
+    fn ident(&self) -> &'static str {
+        T::ident()
     }
 }
