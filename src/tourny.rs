@@ -4,7 +4,7 @@ use crate::player::Player;
 use std::cell::Cell;
 use std::collections::HashMap;
 
-type PlayerConstructor = fn() -> Box<dyn Player>;
+pub type PlayerConstructor = fn() -> Box<dyn Player>;
 
 pub fn default_player<T>() -> Box<dyn Player>
 where

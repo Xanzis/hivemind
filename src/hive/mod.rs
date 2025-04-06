@@ -654,6 +654,7 @@ impl<'a> HiveResult<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn default_hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
