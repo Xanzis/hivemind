@@ -246,10 +246,6 @@ impl<'a, V> BufMapEntry<'a, V> {
 pub struct SpiralBufSet(SpiralBufMap<()>);
 
 impl SpiralBufSet {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
     pub fn insert(&mut self, c: HexCoord) -> bool {
         if self.contains(&c) {
             return false;
@@ -268,7 +264,7 @@ impl SpiralBufSet {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &HexCoord> {
-        self.0.iter().map(|(a, b)| a)
+        self.0.iter().map(|(a, _)| a)
     }
 }
 

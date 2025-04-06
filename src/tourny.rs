@@ -34,7 +34,7 @@ pub fn run_match(
     let mut s_a = 0.0;
     let mut s_b = 0.0;
 
-    for i in 0..rounds {
+    for _ in 0..rounds {
         let round_score = run_game(cons_a, cons_b);
         s_a += round_score.0 / (rounds as f32);
         s_b += round_score.1 / (rounds as f32);
@@ -54,7 +54,7 @@ pub fn run_game(cons_a: PlayerConstructor, cons_b: PlayerConstructor) -> (f32, f
 
     let mut game = HiveGame::new();
 
-    for i in 0..100 {
+    for _ in 0..100 {
         let pa_nodes = Cell::new(node_limit);
         let next = player_a.make_move(game.clone().with_budget(&pa_nodes));
         let res = game.make_move(next);

@@ -84,11 +84,11 @@ fn eval_search(
     };
     let mut mov = HiveMove::pass();
 
-    let mut moves = moves_to_search(&game, depth, color);
+    let moves = moves_to_search(&game, depth, color);
     let mut results: Vec<(HiveMove, HiveResult)> =
         moves.into_iter().map(|m| (m, game.make_move(m))).collect();
 
-    results.sort_by_cached_key(|(m, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
+    results.sort_by_cached_key(|(_, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
 
     for (m, r) in results {
         let node_val = eval_search(r, depth - 1, alpha, beta, color, nodes)

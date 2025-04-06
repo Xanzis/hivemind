@@ -19,9 +19,9 @@ pub trait Heuristic {
 
     fn moves_to_search<'a>(
         &mut self,
-        game: &HiveGame,
+        _game: &HiveGame,
         moves: Vec<(HiveMove, HiveResult<'a>)>,
-        color: bool,
+        _color: bool,
     ) -> Vec<(HiveMove, HiveResult<'a>)> {
         // need this to allow the heuristic to make the moves without duplicating requests
         moves
@@ -29,16 +29,16 @@ pub trait Heuristic {
 
     fn nonrecurse_val(
         &mut self,
-        game: &HiveGame,
-        mov: &HiveMove,
-        res: &HiveResult,
-        color: bool,
+        _game: &HiveGame,
+        _mov: &HiveMove,
+        _res: &HiveResult,
+        _color: bool,
     ) -> Option<i32> {
         // optionally preempt recursion with a node evalation
         None
     }
 
-    fn track_val(&mut self, game: &HiveGame, mov: &HiveMove, val: i32) {
+    fn track_val(&mut self, _game: &HiveGame, _mov: &HiveMove, _val: i32) {
         return;
     }
 
@@ -94,8 +94,8 @@ impl<T: Heuristic + Default> SearchPlayer<T> {
         };
         let mut mov = HiveMove::pass();
 
-        let mut moves = game.valid_moves();
-        let mut results: Vec<(HiveMove, HiveResult)> =
+        let moves = game.valid_moves();
+        let results: Vec<(HiveMove, HiveResult)> =
             moves.into_iter().map(|m| (m, game.make_move(m))).collect();
 
         // standard move processor, for reference when reimplementing

@@ -1,4 +1,4 @@
-use super::{Heuristic, Player, SearchPlayer};
+use super::{Heuristic, SearchPlayer};
 use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
 
 pub type SearchNew = SearchPlayer<SearchHeuristic>;

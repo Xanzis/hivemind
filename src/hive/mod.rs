@@ -4,7 +4,7 @@ use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem::MaybeUninit;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 mod hex;
 pub use hex::{HexCoord, SpiralBufMap, SpiralBufSet, HEXDIR};
@@ -72,7 +72,7 @@ impl<T: Hash + Copy> Hash for Pile<T> {
 impl<T: fmt::Debug + Copy> fmt::Debug for Pile<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
-            let mut iter = (0..self.i).map(|i| self.arr[i as usize].assume_init_ref());
+            let iter = (0..self.len()).map(|i| self.arr[i].assume_init_ref());
             fmt.debug_list().entries(iter).finish()
         }
     }
@@ -182,6 +182,7 @@ impl<T: Copy> HexBoard<T> {
         &self.occupied
     }
 
+    #[allow(dead_code)]
     pub fn disp_perimeter(&self) -> String {
         let mut res: HexBoard<char> = HexBoard::new();
         for &c in self.perimeter() {
@@ -190,6 +191,7 @@ impl<T: Copy> HexBoard<T> {
         res.disp()
     }
 
+    #[allow(dead_code)]
     pub fn disp_occupied(&self) -> String {
         let mut res: HexBoard<char> = HexBoard::new();
         for &c in self.occupied().iter() {
@@ -208,37 +210,6 @@ impl<T: Copy> HexBoard<T> {
 
     pub fn neighbor_pieces<'a>(&'a self, coord: HexCoord) -> impl Iterator<Item = &'a T> {
         coord.neighbors().filter_map(|x| self.get_top(x))
-    }
-
-    fn reachable_without(&self, from: HexCoord, mut to: Vec<HexCoord>, without: HexCoord) -> bool {
-        // starting at from, and not traversing without, can you reach all the coords in to?
-        let mut to_check = vec![from];
-        //let mut visited = HashSet::new();
-        //let mut visited = FxHashSet::default();
-        let mut visited = SpiralBufSet::default();
-
-        while let Some(cur) = to_check.pop() {
-            for nb in self.neighbor_cells(cur) {
-                if nb == without {
-                    continue;
-                }
-
-                if !visited.insert(nb) {
-                    continue;
-                }
-
-                if let Some(i) = to.iter().position(|&x| nb == x) {
-                    to.swap_remove(i);
-                    if to.len() == 0 {
-                        return true;
-                    }
-                }
-
-                to_check.push(nb);
-            }
-        }
-
-        false
     }
 
     fn passable_coords<'a>(
@@ -285,44 +256,6 @@ impl<T: Copy> HexBoard<T> {
             .collect()
     }
 
-    pub fn is_bridge_old(&self, coord: HexCoord) -> bool {
-        // redundant, replaced by find_bridges
-        // keep around as a check that the graph based solution is working correctly
-
-        // if the piece is not a bridge between disjoint hives the number of cells reachable
-        // from one of its neighbors (minus the piece in question) should be occupied-1
-
-        // but also it's not a bridge if it's a stack
-        if self.get(coord).len() > 1 {
-            return false;
-        }
-
-        let mut nbs: Vec<_> = self.neighbor_cells(coord).collect();
-
-        if nbs.len() == 0 {
-            if self.all_top().count() == 1 {
-                return false;
-            } else {
-                panic!("ugh");
-            }
-        }
-
-        // it's not a bridge if it has only 1 neighbor
-        if nbs.len() == 1 {
-            return false;
-        }
-
-        let nb = nbs.pop().unwrap();
-        let other_nbs = nbs;
-        let res = !self.reachable_without(nb, other_nbs, coord);
-
-        let search_res = self.find_bridges().contains(&coord);
-
-        assert_eq!(res, search_res);
-
-        res
-    }
-
     pub fn is_bridge(&self, coord: HexCoord) -> bool {
         // need to compute bridges lazily, using an interior mutability cache
         // cell seems fine as a spiral map is 3 usizes (including the vec pointer)
@@ -353,27 +286,6 @@ impl<T: Copy> HexBoard<T> {
             &mut parent,
             &mut visited,
         );
-
-        // let mut idx_board: HexBoard<DbgUsize> = HexBoard::new();
-        // dfs_idx.iter().for_each(|(&c, &idx)| idx_board.place(c, DbgUsize(idx)));
-
-        // let mut low_board: HexBoard<DbgUsize> = HexBoard::new();
-        // dfs_low.iter().for_each(|(&c, &low)| low_board.place(c, DbgUsize(low)));
-
-        // let mut bridge_board: HexBoard<char> = HexBoard::new();
-        // for (c, _) in self.all_top() {
-        //     if bridges.contains(c) {
-        //         bridge_board.place(*c, 'Y');
-        //     } else {
-        //         bridge_board.place(*c, 'N');
-        //     }
-        // }
-
-        // println!("Completed bridge search");
-        // println!("dfs idx:\n{}", idx_board.disp());
-        // println!("lowest node accessible from subtree:\n{}", low_board.disp());
-
-        // println!("bridges:\n{}", bridge_board.disp());
 
         bridges
     }
@@ -475,6 +387,7 @@ impl From<DbgUsize> for char {
 }
 
 impl<T: Into<char> + Clone + Copy + std::fmt::Debug> HexBoard<T> {
+    #[allow(dead_code)]
     fn disp(&self) -> String {
         // display as a monospace hex grid
 
@@ -689,6 +602,7 @@ impl HiveMove {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_move(&self) -> bool {
         match &self.0 {
             &MoveInner::Place(_, _) => false,
@@ -713,6 +627,7 @@ pub enum HiveResult<'a> {
     WinB(HiveGame<'a>),
     Draw(HiveGame<'a>),
     OutOfMoves(HiveGame<'a>),
+    #[allow(dead_code)]
     Invalid,
 }
 
@@ -841,7 +756,6 @@ impl<'c> HiveGame<'c> {
     }
 
     pub fn valid_moves(&self) -> Vec<HiveMove> {
-        use HiveBug::*;
         let mut res = Vec::new();
 
         // check win conditions
@@ -863,15 +777,8 @@ impl<'c> HiveGame<'c> {
         }
 
         for (&c, &p) in self.board.all_top().filter(|(_, x)| x.color == self.turn) {
-            //println!("Checking out {:?}", (c, p));
             let dests = p.valid_dests(&self.board, c);
 
-            //if p.bug == HiveBug::Spider {
-            //	println!("Checking out {:?}", (c, p));
-            //	println!("It can move to {:?}", dests);
-            //}
-
-            //println!("It can move to {:?}", dests);
             res.extend(
                 dests
                     .into_iter()
@@ -941,6 +848,7 @@ impl<'c> HiveGame<'c> {
         res
     }
 
+    #[allow(dead_code)]
     pub fn disp(&self) -> String {
         format!(
             "Round {}\nTurn {}\nBoard:\n{}",
@@ -950,6 +858,7 @@ impl<'c> HiveGame<'c> {
         )
     }
 
+    #[allow(dead_code)]
     pub fn disp_board(&self) -> String {
         self.board.disp()
     }
