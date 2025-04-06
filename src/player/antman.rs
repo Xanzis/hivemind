@@ -1,165 +1,54 @@
-use super::Player;
+use super::{Heuristic, SearchPlayer};
 use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
 use std::collections::HashMap;
 
+pub type AntMan = SearchPlayer<AntManHeuristic>;
+
 #[derive(Default)]
-pub struct AntMan {
+pub struct AntManHeuristic {
     ant_book: HashMap<u64, i32>, // book of hashed hive results against node values
-    visited_nodes: usize,
-    ant_hits: usize,
 }
 
-impl Player for AntMan {
-    fn make_move(&mut self, game: HiveGame) -> HiveMove {
-        let own_color = game.turn();
-
-        self.visited_nodes = 0;
-        self.ant_hits = 0;
-
-        let res = self.eval(HiveResult::Cont(game), 3, i32::MIN, i32::MAX, own_color);
-
-        println!(
-            "AntMan processed {} nodes, value {}, ant book hits {}",
-            self.visited_nodes, res.0, self.ant_hits
-        );
-
-        res.1
+impl Heuristic for AntManHeuristic {
+    fn leaf_val(&mut self, game: &HiveGame, color: bool) -> i32 {
+        search_val(game, color)
     }
 
-    fn ident(&self) -> &'static str {
-        "antman"
-    }
-}
-
-impl AntMan {
-    fn eval(
+    fn nonrecurse_val(
         &mut self,
-        res: HiveResult<'_>,
-        depth: usize,
-        mut alpha: i32,
-        mut beta: i32,
-        color: bool,
-    ) -> (i32, HiveMove) {
-        self.visited_nodes += 1;
+        game: &HiveGame,
+        mov: &HiveMove,
+        _res: &HiveResult,
+        _color: bool,
+    ) -> Option<i32> {
+        // optionally preempt recursion with a node evalation
+        // antman preempts if the move is an ant move to a board state it's seen before
 
-        let game = match res {
-            HiveResult::WinW(_) => {
-                return if color {
-                    (i32::MAX, HiveMove::pass())
-                } else {
-                    (i32::MIN, HiveMove::pass())
-                }
-            }
-            HiveResult::WinB(_) => {
-                return if !color {
-                    (i32::MAX, HiveMove::pass())
-                } else {
-                    (i32::MIN, HiveMove::pass())
-                }
-            }
-            HiveResult::Draw(_) => return (0, HiveMove::pass()),
-            HiveResult::Cont(g) => g,
-            _ => panic!("eek"),
-        };
+        let is_ant_move = mov
+            .piece()
+            .map(|p| p.bug() == HiveBug::Ant)
+            .unwrap_or(false);
 
-        if depth == 0 {
-            return (search_val(&game, color), HiveMove::pass());
-        }
-
-        if game.turn() == color {
-            // maximizing player
-            let mut value = i32::MIN;
-            let mut mov = HiveMove::pass();
-
-            // sort by heuristic value for better pruning
-            let mut moves = game.valid_moves();
-            moves.sort_by_cached_key(|&m| {
-                -1 * search_val(&game.make_move(m).game().unwrap(), color)
-            });
-
-            for m in moves {
-                let node = game.make_move(m);
-
-                let node_val = {
-                    let is_ant_move = m.piece().map(|p| p.bug() == HiveBug::Ant).unwrap_or(false);
-
-                    if is_ant_move {
-                        if let Some(&v) = self.ant_book.get(&node.default_hash()) {
-                            self.ant_hits += 1;
-                            v
-                        } else {
-                            let v = self
-                                .eval(node.clone(), depth - 1, alpha, beta, color)
-                                .0
-                                .saturating_sub(1);
-                            self.ant_book.insert(node.default_hash(), v);
-                            v
-                        }
-                    } else {
-                        self.eval(node, depth - 1, alpha, beta, color)
-                            .0
-                            .saturating_sub(1)
-                    }
-                };
-
-                if node_val > value {
-                    value = node_val;
-                    mov = m;
-                }
-
-                if value > beta {
-                    break;
-                }
-
-                alpha = alpha.max(value);
-            }
-            return (value, mov);
+        if is_ant_move {
+            self.ant_book.get(&game.default_hash()).cloned() // None if the game is not in book
         } else {
-            // minimizing player
-            let mut value = i32::MAX;
-            let mut mov = HiveMove::pass();
-
-            // sort by heuristic value for better pruning
-            let mut moves = game.valid_moves();
-            moves.sort_by_cached_key(|&m| search_val(&game.make_move(m).game().unwrap(), color));
-
-            for m in moves {
-                let node = game.make_move(m);
-
-                let node_val = {
-                    let is_ant_move = m.piece().map(|p| p.bug() == HiveBug::Ant).unwrap_or(false);
-
-                    if is_ant_move {
-                        if let Some(&v) = self.ant_book.get(&node.default_hash()) {
-                            v
-                        } else {
-                            let v = self
-                                .eval(node.clone(), depth - 1, alpha, beta, color)
-                                .0
-                                .saturating_sub(1);
-                            self.ant_book.insert(node.default_hash(), v);
-                            v
-                        }
-                    } else {
-                        self.eval(node, depth - 1, alpha, beta, color)
-                            .0
-                            .saturating_sub(1)
-                    }
-                };
-
-                if node_val < value {
-                    value = node_val;
-                    mov = m;
-                }
-
-                if value < alpha {
-                    break;
-                }
-
-                beta = beta.min(value);
-            }
-            return (value, mov);
+            None
         }
+    }
+
+    fn track_val(&mut self, game: &HiveGame, mov: &HiveMove, val: i32) {
+        let is_ant_move = mov
+            .piece()
+            .map(|p| p.bug() == HiveBug::Ant)
+            .unwrap_or(false);
+
+        if is_ant_move {
+            self.ant_book.insert(game.default_hash(), val);
+        }
+    }
+
+    fn ident() -> &'static str {
+        "antman"
     }
 }
 

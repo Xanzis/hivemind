@@ -19,12 +19,14 @@ pub trait Heuristic {
 
     fn moves_to_search<'a>(
         &mut self,
-        _game: &HiveGame,
+        game: &HiveGame,
         moves: Vec<(HiveMove, HiveResult<'a>)>,
         _color: bool,
     ) -> Vec<(HiveMove, HiveResult<'a>)> {
-        // need this to allow the heuristic to make the moves without duplicating requests
-        moves
+        // usually a good start to sort by leaf value, but possible to improve significantly (killer move etc)
+        let mut m = moves;
+        m.sort_by_cached_key(|(_, r)| -1 * self.leaf_val(r.game_ref().unwrap(), game.turn()));
+        m
     }
 
     fn nonrecurse_val(

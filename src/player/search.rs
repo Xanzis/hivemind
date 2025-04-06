@@ -1,7 +1,7 @@
 use super::{Heuristic, SearchPlayer};
-use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
+use crate::hive::{HiveBug, HiveGame};
 
-pub type SearchNew = SearchPlayer<SearchHeuristic>;
+pub type Search = SearchPlayer<SearchHeuristic>;
 
 #[derive(Default)]
 pub struct SearchHeuristic();
@@ -9,17 +9,6 @@ pub struct SearchHeuristic();
 impl Heuristic for SearchHeuristic {
     fn leaf_val(&mut self, game: &HiveGame, color: bool) -> i32 {
         search_val(game, color)
-    }
-
-    fn moves_to_search<'a>(
-        &mut self,
-        game: &HiveGame,
-        mut moves: Vec<(HiveMove, HiveResult<'a>)>,
-        _color: bool,
-    ) -> Vec<(HiveMove, HiveResult<'a>)> {
-        moves.sort_by_cached_key(|(_, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
-
-        moves
     }
 
     fn ident() -> &'static str {
