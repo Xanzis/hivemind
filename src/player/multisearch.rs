@@ -1,188 +1,72 @@
-use super::Player;
 use crate::hive::{HiveBug, HiveGame, HiveMove, HiveResult};
+use crate::player::{Heuristic, SearchPlayer};
+
+pub type MultiSearch = SearchPlayer<MultiSearchHeuristic>;
 
 #[derive(Default)]
-pub struct MultiSearch();
+pub struct MultiSearchHeuristic();
 
-impl Player for MultiSearch {
-    fn make_move(&mut self, game: HiveGame) -> HiveMove {
-        let own_color = game.turn();
+impl Heuristic for MultiSearchHeuristic {
+    fn leaf_val(&mut self, game: &HiveGame, color: bool) -> i32 {
+        search_val(game, color)
+    }
 
-        let mut nodes: u32 = 0;
+    fn moves_to_search<'a>(
+        &mut self,
+        game: &HiveGame,
+        moves: Vec<(HiveMove, HiveResult<'a>)>,
+        depth: usize,
+        color: bool,
+    ) -> Vec<(HiveMove, HiveResult<'a>)> {
+        let own_queen = game.queen_loc(color);
+        let opp_queen = game.queen_loc(!color);
 
-        let mut depth = 1;
+        let mut m = match depth {
+            0..=1 => {
+                // at bottom of tree, consider only queen moves and moves to/from queen
+                moves
+                    .into_iter()
+                    .filter(|&(ref m, _)| {
+                        let move_bug: Option<HiveBug> = m.piece().map(|p| p.bug());
 
-        let res = loop {
-            let cur_res = eval_search(
-                HiveResult::Cont(game.clone()),
-                depth,
-                i32::MIN,
-                i32::MAX,
-                own_color,
-                &mut nodes,
-            );
-
-            //println!("depth {} move {:?}", depth, cur_res);
-
-            if game.move_budget() == 0 {
-                // out of budget to expand nodes
-                // return the best move at the latest depth
-                break cur_res;
+                        m.is_pass()
+                            || move_bug == Some(HiveBug::Queen)
+                            || match (m.dest(), own_queen, opp_queen) {
+                                (Some(a), Some(b), Some(c)) => a.dist(&b) == 1 || a.dist(&c) == 1,
+                                (Some(a), Some(b), None) => a.dist(&b) == 1,
+                                (Some(a), None, Some(b)) => a.dist(&b) == 1,
+                                _ => false,
+                            }
+                            || match (m.orig(), own_queen, opp_queen) {
+                                (Some(a), Some(b), Some(c)) => a.dist(&b) == 1 || a.dist(&c) == 1,
+                                (Some(a), Some(b), None) => a.dist(&b) == 1,
+                                (Some(a), None, Some(b)) => a.dist(&b) == 1,
+                                _ => false,
+                            }
+                    })
+                    .collect()
             }
-
-            depth += 1;
+            2..=4 => {
+                // near bottom of the tree, search placements and moves that aren't ants
+                moves
+                    .into_iter()
+                    .filter(|&(ref m, _)| {
+                        m.is_pass()
+                            || m.piece().map(|p| p.bug()) != Some(HiveBug::Ant)
+                            || m.is_place()
+                    })
+                    .collect()
+            }
+            _ => moves,
         };
 
-        //println!("MultiSearch processed {} nodes, value {}", nodes, res.0);
-        res.1
+        m.sort_by_cached_key(|(_, r)| -1 * self.leaf_val(r.game_ref().unwrap(), game.turn()));
+        m
     }
 
-    fn ident(&self) -> &'static str {
+    fn ident() -> &'static str {
         "multisearch"
     }
-}
-
-fn eval_search(
-    res: HiveResult,
-    depth: usize,
-    mut alpha: i32,
-    mut beta: i32,
-    color: bool,
-    nodes: &mut u32,
-) -> (i32, HiveMove) {
-    *nodes += 1;
-
-    let game = match res {
-        HiveResult::WinW(_) => {
-            return if color {
-                (i32::MAX, HiveMove::pass())
-            } else {
-                (i32::MIN, HiveMove::pass())
-            }
-        }
-        HiveResult::WinB(_) => {
-            return if !color {
-                (i32::MAX, HiveMove::pass())
-            } else {
-                (i32::MIN, HiveMove::pass())
-            }
-        }
-        HiveResult::Draw(_) => return (0, HiveMove::pass()),
-        HiveResult::OutOfMoves(g) => return (search_val(&g, color), HiveMove::pass()), // out of moves, return heuristic value
-        HiveResult::Cont(g) => g,
-        _ => panic!("eek"),
-    };
-
-    if depth == 0 {
-        return (search_val(&game, color), HiveMove::pass());
-    }
-
-    let mut value = if game.turn() == color {
-        i32::MIN
-    } else {
-        i32::MAX
-    };
-    let mut mov = HiveMove::pass();
-
-    let moves = moves_to_search(&game, depth, color);
-    let mut results: Vec<(HiveMove, HiveResult)> =
-        moves.into_iter().map(|m| (m, game.make_move(m))).collect();
-
-    results.sort_by_cached_key(|(_, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
-
-    for (m, r) in results {
-        let node_val = eval_search(r, depth - 1, alpha, beta, color, nodes)
-            .0
-            .saturating_sub(1);
-
-        if game.turn() == color {
-            // maximizing player
-            if node_val > value {
-                value = node_val;
-                mov = m;
-            }
-
-            if value > beta {
-                break;
-            }
-
-            alpha = alpha.max(value);
-        } else {
-            if node_val < value {
-                value = node_val;
-                mov = m;
-            }
-
-            if value < alpha {
-                break;
-            }
-
-            beta = beta.min(value);
-        }
-    }
-
-    (value, mov)
-}
-
-fn moves_to_search(game: &HiveGame, depth: usize, color: bool) -> Vec<HiveMove> {
-    let valid_moves = game.valid_moves();
-
-    // fully search up to a near depth
-    if depth > 3 {
-        return valid_moves;
-    }
-
-    let mut res = Vec::new();
-
-    let own_queen = game.queen_loc(color);
-    let opp_queen = game.queen_loc(!color);
-
-    for m in valid_moves {
-        // ugh
-        if m.is_pass() {
-            res.push(m);
-            continue;
-        }
-
-        // if move is to queen, consider it
-        if let Some(d) = m.dest() {
-            if let Some(l) = own_queen {
-                if d.dist(&l) == 1 {
-                    res.push(m);
-                    continue;
-                }
-            }
-
-            if let Some(l) = opp_queen {
-                if d.dist(&l) == 1 {
-                    res.push(m);
-                    continue;
-                }
-            }
-        }
-
-        // stop adding lower-value moves farther down the tree
-        if depth < 2 {
-            continue;
-        }
-
-        // placements are fine to check out
-        if m.is_place() {
-            res.push(m);
-            continue;
-        }
-
-        // if move is not an ant, consider it
-        // should cut search space way down, probably ok to ignore non-queen ant moves in the far future
-        // future work: maybe consider ant moves if they trap a piece?
-        // ie if they have one neighbor which is the opposite color as the current move
-        if m.piece().unwrap().bug() != HiveBug::Ant {
-            res.push(m);
-            continue;
-        }
-    }
-
-    res
 }
 
 fn search_val(game: &HiveGame, color: bool) -> i32 {

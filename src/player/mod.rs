@@ -21,6 +21,7 @@ pub trait Heuristic {
         &mut self,
         game: &HiveGame,
         moves: Vec<(HiveMove, HiveResult<'a>)>,
+        _depth: usize,
         _color: bool,
     ) -> Vec<(HiveMove, HiveResult<'a>)> {
         // usually a good start to sort by leaf value, but possible to improve significantly (killer move etc)
@@ -103,7 +104,7 @@ impl<T: Heuristic + Default> SearchPlayer<T> {
         // standard move processor, for reference when reimplementing
         // results.sort_by_cached_key(|(m, r)| -1 * search_val(r.game_ref().unwrap(), game.turn()));
 
-        for (m, r) in self.0.moves_to_search(&game, results, color) {
+        for (m, r) in self.0.moves_to_search(&game, results, depth, color) {
             let node_val = if let Some(v) = self.0.nonrecurse_val(&game, &m, &r, color) {
                 v
             } else {

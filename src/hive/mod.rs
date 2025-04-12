@@ -594,6 +594,14 @@ impl HiveMove {
         }
     }
 
+    pub fn orig(&self) -> Option<HexCoord> {
+        match &self.0 {
+            &MoveInner::Place(_, _) => None,
+            &MoveInner::Move(_, c, _) => Some(c),
+            &MoveInner::Pass => None,
+        }
+    }
+
     pub fn is_place(&self) -> bool {
         match &self.0 {
             &MoveInner::Place(_, _) => true,
