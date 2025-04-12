@@ -16,14 +16,14 @@ where
 pub fn run_match(
     cons_a: PlayerConstructor,
     cons_b: PlayerConstructor,
-    elos: &mut HashMap<&'static str, f32>,
+    elos: &mut HashMap<String, f32>,
     rounds: usize,
 ) {
-    let ident_a = cons_a().ident();
-    let ident_b = cons_b().ident();
+    let ident_a = cons_a().ident().to_string();
+    let ident_b = cons_b().ident().to_string();
 
-    let elo_a = *elos.entry(ident_a).or_insert(1000.0);
-    let elo_b = *elos.entry(ident_b).or_insert(1000.0);
+    let elo_a = *elos.entry(ident_a.clone()).or_insert(1000.0);
+    let elo_b = *elos.entry(ident_b.clone()).or_insert(1000.0);
 
     let q_a = 10.0f32.powf(elo_a / 400.0);
     let q_b = 10.0f32.powf(elo_b / 400.0);

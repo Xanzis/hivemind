@@ -59,19 +59,5 @@ fn search_val(game: &HiveGame, color: bool) -> i32 {
         }
     }
 
-    // own pieces not being bridges is good (freer to move)
-    // removing for now, bridge finding is super expensive
-    for (&c, &p) in board.all_top() {
-        if p.color() == color {
-            if !board.is_bridge(c) {
-                res += 2;
-
-                if p.bug() == HiveBug::Ant {
-                    res += 2;
-                }
-            }
-        }
-    }
-
     res
 }

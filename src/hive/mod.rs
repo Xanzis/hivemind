@@ -256,7 +256,7 @@ impl<T: Copy> HexBoard<T> {
             .collect()
     }
 
-    pub fn is_bridge(&self, coord: HexCoord) -> bool {
+    fn is_bridge(&self, coord: HexCoord) -> bool {
         // need to compute bridges lazily, using an interior mutability cache
         // cell seems fine as a spiral map is 3 usizes (including the vec pointer)
         let bridges = self.bridges.take().unwrap_or_else(|| self.find_bridges());

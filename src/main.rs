@@ -2,8 +2,7 @@ mod hive;
 mod player;
 mod tourny;
 
-use hive::{HiveBug, HiveGame, HiveResult};
-use player::Player;
+use hive::{HiveGame, HiveResult};
 use tourny::{default_player, PlayerConstructor};
 
 use clap::{Args, Parser, Subcommand};
@@ -11,6 +10,7 @@ use clap::{Args, Parser, Subcommand};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::fs;
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -23,13 +23,18 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Run a tournament between all available players
-    Tournament,
+    Tournament(TournamentArgs),
 
     /// Run a game between a given pair of players
     Game(GameArgs),
 
     /// List available players
     ListPlayers,
+}
+
+#[derive(Args)]
+struct TournamentArgs {
+    elo_path: PathBuf,
 }
 
 #[derive(Args)]
@@ -52,8 +57,8 @@ fn main() {
     ];
 
     match cli.command {
-        Commands::Tournament => {
-            run_tournament(&players);
+        Commands::Tournament(args) => {
+            run_tournament(&players, args.elo_path);
         }
         Commands::Game(args) => {
             let a = players
@@ -73,8 +78,8 @@ fn main() {
     }
 }
 
-fn run_tournament(players: &[PlayerConstructor]) {
-    let mut elos = HashMap::new();
+fn run_tournament(players: &[PlayerConstructor], elo_path: PathBuf) {
+    let mut elos = load_elos(elo_path.clone()).unwrap_or(HashMap::new());
 
     for a in 0..players.len() {
         for b in (0..players.len()).filter(|x| *x != a) {
@@ -85,14 +90,16 @@ fn run_tournament(players: &[PlayerConstructor]) {
             println!(
                 "... done, elos ({}, {}), ({}, {})",
                 ident_a,
-                elos.get(&ident_a).unwrap(),
+                elos.get(ident_a).unwrap(),
                 ident_b,
-                elos.get(&ident_b).unwrap()
+                elos.get(ident_b).unwrap()
             );
         }
     }
 
     println!("{:?}", elos);
+
+    let _ = save_elos(elo_path, &elos);
 }
 
 fn run_game(a: PlayerConstructor, b: PlayerConstructor) {
@@ -104,7 +111,7 @@ fn run_game(a: PlayerConstructor, b: PlayerConstructor) {
     let mut game = HiveGame::new();
     println!("\nGame state:\n{}", game.disp());
 
-    for i in 0..100 {
+    for _ in 0..100 {
         let p1_nodes = Cell::new(node_limit);
         let next = player1.make_move(game.clone().with_budget(&p1_nodes));
         let res = game.make_move(next);
@@ -117,8 +124,6 @@ fn run_game(a: PlayerConstructor, b: PlayerConstructor) {
 
         println!("\nGame state:\n{}", game.disp());
         println!("Possible next moves: {}", game.valid_moves().iter().count());
-        //println!("Board occupied:\n{}", game.board().disp_occupied());
-        //println!("Board perimeter:\n{}", game.board().disp_perimeter());
 
         let p2_nodes = Cell::new(node_limit);
         let next = player2.make_move(game.clone().with_budget(&p2_nodes));
@@ -131,8 +136,6 @@ fn run_game(a: PlayerConstructor, b: PlayerConstructor) {
         }
 
         println!("Game disp:\n{}", game.disp());
-        //println!("Board occupied:\n{}", game.board().disp_occupied());
-        //println!("Board perimeter:\n{}", game.board().disp_perimeter());
     }
 }
 
@@ -159,4 +162,14 @@ fn process_result(res: HiveResult) -> Option<HiveGame> {
             panic!("Should never happen, top level game has no move budget")
         }
     }
+}
+
+fn load_elos(path: PathBuf) -> std::io::Result<HashMap<String, f32>> {
+    let file = fs::read_to_string(path)?;
+    Ok(serde_json::from_str(&file).unwrap())
+}
+
+fn save_elos(path: PathBuf, elos: &HashMap<String, f32>) -> std::io::Result<()> {
+    let json = serde_json::to_string(elos).unwrap();
+    fs::write(path, json)
 }
