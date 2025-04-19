@@ -78,6 +78,10 @@ fn main() {
             run_simul(&players, args.elo_path, *a);
         }
         Commands::Game(args) => {
+            // in a 1:1 game, user can be a player
+            let mut players = players;
+            players.push(default_player::<player::me::Me>);
+
             let a = players
                 .iter()
                 .position(|p| p().ident() == &args.player_a)
