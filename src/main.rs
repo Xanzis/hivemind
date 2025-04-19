@@ -25,6 +25,9 @@ enum Commands {
     /// Run a tournament between all available players
     Tournament(TournamentArgs),
 
+    /// Run a single player against all other players
+    Simul(SimulArgs),
+
     /// Run a game between a given pair of players
     Game(GameArgs),
 
@@ -35,6 +38,12 @@ enum Commands {
 #[derive(Args)]
 struct TournamentArgs {
     elo_path: PathBuf,
+}
+
+#[derive(Args)]
+struct SimulArgs {
+    elo_path: PathBuf,
+    player_a: String,
 }
 
 #[derive(Args)]
@@ -54,11 +63,19 @@ fn main() {
         default_player::<player::random::Random>,
         default_player::<player::search::Search>,
         default_player::<player::swarm::Swarm>,
+        default_player::<player::nuance::Nuance>,
     ];
 
     match cli.command {
         Commands::Tournament(args) => {
             run_tournament(&players, args.elo_path);
+        }
+        Commands::Simul(args) => {
+            let a = players
+                .iter()
+                .find(|p| p().ident() == &args.player_a)
+                .unwrap();
+            run_simul(&players, args.elo_path, *a);
         }
         Commands::Game(args) => {
             let a = players
@@ -95,6 +112,28 @@ fn run_tournament(players: &[PlayerConstructor], elo_path: PathBuf) {
                 elos.get(ident_b).unwrap()
             );
         }
+    }
+
+    println!("{:?}", elos);
+
+    let _ = save_elos(elo_path, &elos);
+}
+
+fn run_simul(players: &[PlayerConstructor], elo_path: PathBuf, player_a: PlayerConstructor) {
+    let mut elos = load_elos(elo_path.clone()).unwrap_or(HashMap::new());
+
+    for player_b in players.iter().copied() {
+        let ident_a = player_a().ident();
+        let ident_b = player_b().ident();
+        println!("running match between {} and {} ...", ident_a, ident_b);
+        tourny::run_match(player_a, player_b, &mut elos, 5);
+        println!(
+            "... done, elos ({}, {}), ({}, {})",
+            ident_a,
+            elos.get(ident_a).unwrap(),
+            ident_b,
+            elos.get(ident_b).unwrap()
+        );
     }
 
     println!("{:?}", elos);

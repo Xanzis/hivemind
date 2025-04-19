@@ -4,6 +4,7 @@ pub mod antman;
 pub mod min_move;
 pub mod min_queen_move;
 pub mod multisearch;
+pub mod nuance;
 pub mod random;
 pub mod search;
 pub mod swarm;
