@@ -742,6 +742,14 @@ impl<'c> HiveGame<'c> {
         &self.board
     }
 
+    pub fn hand(&self, color: bool) -> &HashMap<HiveBug, u8> {
+        if color {
+            &self.hand_w
+        } else {
+            &self.hand_b
+        }
+    }
+
     pub fn default_hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);

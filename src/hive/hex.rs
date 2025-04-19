@@ -61,6 +61,10 @@ impl HexCoord {
         (row, col)
     }
 
+    pub fn to_cube(&self) -> (i8, i8, i8) {
+        (self.0, self.1, 0 - self.0 - self.1)
+    }
+
     pub fn dist(&self, other: &Self) -> i8 {
         let v = *self - *other;
         ((v.0).abs() + (v.0 + v.1).abs() + (v.1).abs()) / 2
@@ -246,6 +250,10 @@ impl<'a, V> BufMapEntry<'a, V> {
 pub struct SpiralBufSet(SpiralBufMap<()>);
 
 impl SpiralBufSet {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn insert(&mut self, c: HexCoord) -> bool {
         if self.contains(&c) {
             return false;
